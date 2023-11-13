@@ -20,7 +20,7 @@ cp ${sysctl_path} /etc/sysctl.conf.backup
 echo "Файл сохранен по пути /etc/sysctl.conf.backup"
 sleep 1s
 echo "${yellow}Скачиваем новый файл sysctl.conf${reset}"
-wget "https://s3.marzban.ru/files/configs/sysctl.conf" -q -O  ${sysctl_path}
+wget "https://raw.githubusercontent.com/DigneZzZ/dignezzz.github.io/main/server/sysctl.conf" -q -O  ${sysctl_path}
 
 echo "${yellow}Перезапускаем сеть${reset}"
 sysctl -p
