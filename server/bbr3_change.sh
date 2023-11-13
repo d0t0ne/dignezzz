@@ -61,7 +61,7 @@ if [ $level -gt 0 ]; then
 
     # Выполняем соответствующее действие в зависимости от уровня
     echo -e "\e[33mУстанавливаем ядро, не закрывайте окно\e[0m"
-    run_command "sudo apt update && sudo apt install -y linux-xanmod-x64v$level"
+    run_command "sudo apt-get update && sudo apt-get install -y linux-xanmod-x64v$level"
 
     # Перезагрузка сервера
     echo -e "\e[33mУстановка успешно завершена, теперь Вы можете перезагрузить сервер командой reboot\nНе забывайте, что после перезагрузки необходимо выполнить вторую часть скрипта\e[0m"
