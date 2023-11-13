@@ -12,18 +12,19 @@ clear
 
 # Вывод заголовка
 tput bold
-print_message 3 "
-███    ███  █████  ██████  ███████ ██████   █████  ███    ██ 
-████  ████ ██   ██ ██   ██    ███  ██   ██ ██   ██ ████   ██ 
-██ ████ ██ ███████ ██████    ███   ██████  ███████ ██ ██  ██ 
-██  ██  ██ ██   ██ ██   ██  ███    ██   ██ ██   ██ ██  ██ ██ 
-██      ██ ██   ██ ██   ██ ███████ ██████  ██   ██ ██   ████ 
-                                                             
-"
-print_message 3 "Скрипт активиации BBR3 нового ядра XANMOD"
+echo '  
+                           
+BBBB  Y   Y     DDD  III  GGG  N   N EEEE ZZZZZ ZZZZZ ZZZZZ 
+B   B  Y Y      D  D  I  G     NN  N E       Z     Z     Z  
+BBBB    Y       D  D  I  G  GG N N N EEE    Z     Z     Z   
+B   B   Y       D  D  I  G   G N  NN E     Z     Z     Z    
+BBBB    Y       DDD  III  GGG  N   N EEEE ZZZZZ ZZZZZ ZZZZZ 
+                                                            
 
-# Пауза на 4 секунды
-sleep 4
+'
+sleep 2s
+print_message 3 "Скрипт активиации BBR3 нового ядра XANMOD"
+sleep 1s
 
 # Выполнить команду depmod -a
 depmod -a
