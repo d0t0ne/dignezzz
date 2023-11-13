@@ -10,6 +10,17 @@ BBBB    Y       DDD  III  GGG  N   N EEEE ZZZZZ ZZZZZ ZZZZZ
 '
 sleep 2s
 
+
+# Получаем информацию о системе
+os_name=$(lsb_release -is)
+
+# Проверяем, является ли система Ubuntu
+if [ "$os_name" != "Ubuntu" ]; then
+    echo "Этот скрипт поддерживает только Ubuntu. Вы используете $os_name, которая не поддерживается."
+    exit 1
+fi
+
+
 # Пути и стандартные значения
 sysctl_path="/etc/sysctl.conf"
 
