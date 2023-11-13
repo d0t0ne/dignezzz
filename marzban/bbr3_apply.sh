@@ -1,16 +1,21 @@
 #!/bin/bash
+# Получаем информацию о системе
+os_name=$(lsb_release -is)
 
-# Функция для установки цвета и вывода сообщения
+# Проверяем, является ли система Ubuntu
+if [ "$os_name" != "Ubuntu" ]; then
+    echo "Этот скрипт поддерживает только Ubuntu. Вы используете $os_name, которая не поддерживается."
+    exit 1
+fi
+
 print_message() {
     tput setaf $1
     echo $2
     tput sgr0
 }
 
-# Очистка экрана
 clear
 
-# Вывод заголовка
 tput bold
 echo '  
                            
