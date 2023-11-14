@@ -26,40 +26,29 @@ sleep 4
 echo -e "\e[33mУдаляем старые значения\e[0m"
 
 # Удаление старых значений системных лимитов
-sed -i '/ulimit -c/d' /etc/profile
-sed -i '/ulimit -d/d' /etc/profile
-sed -i '/ulimit -f/d' /etc/profile
-sed -i '/ulimit -i/d' /etc/profile
-sed -i '/ulimit -l/d' /etc/profile
-sed -i '/ulimit -m/d' /etc/profile
-sed -i '/ulimit -n/d' /etc/profile
-sed -i '/ulimit -q/d' /etc/profile
-sed -i '/ulimit -s/d' /etc/profile
-sed -i '/ulimit -t/d' /etc/profile
-sed -i '/ulimit -u/d' /etc/profile
-sed -i '/ulimit -v/d' /etc/profile
-sed -i '/ulimit -x/d' /etc/profile
-sed -i '/ulimit -s/d' /etc/profile
+sed -i '/ulimit -[cdfilmnqstuvx]/d' /etc/profile
 
 echo -e "\e[33mВсе старые значения удалены.\e[0m"
 
 echo -e "\e[33mДобавляем новые значения\e[0m"
 
 # Добавление новых значений системных лимитов
-echo "ulimit -c unlimited" | tee -a /etc/profile
-echo "ulimit -d unlimited" | tee -a /etc/profile
-echo "ulimit -f unlimited" | tee -a /etc/profile
-echo "ulimit -i unlimited" | tee -a /etc/profile
-echo "ulimit -l unlimited" | tee -a /etc/profile
-echo "ulimit -m unlimited" | tee -a /etc/profile
-echo "ulimit -n 1048576" | tee -a /etc/profile
-echo "ulimit -q unlimited" | tee -a /etc/profile
-echo "ulimit -s -H 65536" | tee -a /etc/profile
-echo "ulimit -s 32768" | tee -a /etc/profile
-echo "ulimit -t unlimited" | tee -a /etc/profile
-echo "ulimit -u unlimited" | tee -a /etc/profile
-echo "ulimit -v unlimited" | tee -a /etc/profile
-echo "ulimit -x unlimited" | tee -a /etc/profile
+cat << EOF | tee -a /etc/profile
+ulimit -c unlimited
+ulimit -d unlimited
+ulimit -f unlimited
+ulimit -i unlimited
+ulimit -l unlimited
+ulimit -m unlimited
+ulimit -n 1048576
+ulimit -q unlimited
+ulimit -s -H 65536
+ulimit -s 32768
+ulimit -t unlimited
+ulimit -u unlimited
+ulimit -v unlimited
+ulimit -x unlimited
+EOF
 
 echo -e "\e[33mВсе новые значения добавлены.\e[0m"
 
