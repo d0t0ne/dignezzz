@@ -26,8 +26,10 @@ sleep 1
 echo -e "\e[33mОпределяем доступную версию ядра\e[0m"
 # Функция для выполнения команды и обработки вывода
 run_command() {
-    result=$(eval $1)
-    if [ $? -ne 0 ]; then
+    local command=$1
+    local result=$(eval $command)
+    local exit_code=$?
+    if [ $exit_code -ne 0 ]; then
         echo "Ошибка выполнения команды: $result"
         exit 1
     fi
@@ -37,7 +39,7 @@ run_command() {
 # Получение информации о CPU
 cpu_info=$(run_command "cat /proc/cpuinfo")
 
-# Определение уровня 
+# Определение уровня поддержки
 level=0
 if [[ $cpu_info =~ lm|cmov|cx8|fpu|fxsr|mmx|syscall|sse2 ]]; then
     level=1
@@ -53,18 +55,43 @@ if [[ $level -eq 3 && $cpu_info =~ avx512f|avx512bw|avx512cd|avx512dq|avx512vl ]
 fi
 
 if [ $level -gt 0 ]; then
-    echo -e "\e[33mCPU поддерживается x86-64-v$level\e[0m"
-    echo -e "\e[33mСкачиваем ключи репозитория\e[0m"
+    tput setaf 3
+    echo "CPU поддерживается x86-64-v$level"
+    tput sgr0
+
+    tput setaf 3
+    echo "Скачиваем ключи репозитория"
+    tput sgr0
     run_command "wget -qO - https://gitlab.com/afrd.gpg | sudo gpg --dearmor -o /usr/share/keyrings/xanmod-archive-keyring.gpg --yes"
-    echo -e "\e[33mДобавляем репозиторий\e[0m"
+    tput setaf 3
+    echo "Добавляем репозиторий"
+    tput sgr0
     run_command "echo 'deb [signed-by=/usr/share/keyrings/xanmod-archive-keyring.gpg] http://deb.xanmod.org releases main' | sudo tee /etc/apt/sources.list.d/xanmod-release.list"
 
-    # Выполняем соответствующее действие в зависимости от уровня
-    echo -e "\e[33mУстанавливаем ядро, не закрывайте окно\e[0m"
-    run_command "sudo apt-get update && sudo apt-get install -y linux-xanmod-x64v$level"
+    # Выполнить соответствующее действие в зависимости от уровня
+    tput setaf 3
+    echo "Устанавливаем ядро, не закрывайте окно"
+    tput sgr0
+    case $level in
+        1)
+            run_command "sudo apt update && sudo apt install -y linux-xanmod-x64v1"
+            ;;
+        2)
+            run_command "sudo apt update && sudo apt install -y linux-xanmod-x64v2"
+            ;;
+        3)
+            run_command "sudo apt update && sudo apt install -y linux-xanmod-x64v3"
+            ;;
+        4)
+            run_command "sudo apt update && sudo apt install -y linux-xanmod-x64v4"
+            ;;
+    esac
 
     # Перезагрузка сервера
-    echo -e "\e[33mУстановка успешно завершена, теперь Вы можете перезагрузить сервер командой reboot\nНе забывайте, что после перезагрузки необходимо выполнить вторую часть скрипта\e[0m"
+    tput setaf 3
+    echo "Установка успешно завершена, теперь Вы можете перезагрузить сервер командой reboot"
+    tput sgr0
+    echo "Не забывайте, что после перезагрузки необходимо выполнить вторую часть скрипта"
 else
     echo "Неподдерживаемый уровень"
 fi
