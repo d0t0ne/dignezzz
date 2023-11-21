@@ -35,10 +35,8 @@ run_command() {
     fi
     echo $result
 }
-
 # Получение информации о CPU
 cpu_info=$(run_command "cat /proc/cpuinfo")
-
 # Определение уровня поддержки
 level=0
 if [[ $cpu_info =~ lm|cmov|cx8|fpu|fxsr|mmx|syscall|sse2 ]]; then
@@ -53,28 +51,17 @@ fi
 if [[ $level -eq 3 && $cpu_info =~ avx512f|avx512bw|avx512cd|avx512dq|avx512vl ]]; then
     level=4
 fi
-
 if [ $level -gt 0 ]; then
-    tput setaf 3
     echo "CPU поддерживается x86-64-v$level"
-    tput sgr0
-
-    tput setaf 3
     echo "Скачиваем ключи репозитория"
-    tput sgr0
     run_command "wget -qO - https://gitlab.com/afrd.gpg | sudo gpg --dearmor -o /usr/share/keyrings/xanmod-archive-keyring.gpg --yes"
-    tput setaf 3
     echo "Добавляем репозиторий"
-    tput sgr0
     run_command "echo 'deb [signed-by=/usr/share/keyrings/xanmod-archive-keyring.gpg] http://deb.xanmod.org releases main' | sudo tee /etc/apt/sources.list.d/xanmod-release.list"
-
     # Выполнить соответствующее действие в зависимости от уровня
-    tput setaf 3
     echo "Устанавливаем ядро, не закрывайте окно"
-    tput sgr0
     case $level in
         1)
-            run_command "sudo apt update && sudo apt install -y linux-xanmod-x64v1"
+            run_command "sudo apt-get update && sudo apt install -y linux-xanmod-x64v1"
             ;;
         2)
             run_command "sudo apt update && sudo apt install -y linux-xanmod-x64v2"
@@ -86,11 +73,8 @@ if [ $level -gt 0 ]; then
             run_command "sudo apt update && sudo apt install -y linux-xanmod-x64v4"
             ;;
     esac
-
     # Перезагрузка сервера
-    tput setaf 3
     echo "Установка успешно завершена, теперь Вы можете перезагрузить сервер командой reboot"
-    tput sgr0
     echo "Не забывайте, что после перезагрузки необходимо выполнить вторую часть скрипта"
 else
     echo "Неподдерживаемый уровень"
