@@ -61,16 +61,16 @@ if [ $level -gt 0 ]; then
     echo "Устанавливаем ядро, не закрывайте окно"
     case $level in
         1)
-            run_command "sudo apt-get update && sudo apt install -y linux-xanmod-x64v1"
+            run_command "sudo apt-get update && sudo apt-get install -yqq linux-xanmod-x64v1"
             ;;
         2)
-            run_command "sudo apt update && sudo apt install -y linux-xanmod-x64v2"
+            run_command "sudo apt-get update && sudo apt-get install -yqq linux-xanmod-x64v2"
             ;;
         3)
-            run_command "sudo apt update && sudo apt install -y linux-xanmod-x64v3"
+            run_command "sudo apt-get update && sudo apt-get install -yqq linux-xanmod-x64v3"
             ;;
         4)
-            run_command "sudo apt update && sudo apt install -y linux-xanmod-x64v4"
+            run_command "sudo apt-get update && sudo apt-get install -yqq linux-xanmod-x64v4"
             ;;
     esac
     # Перезагрузка сервера
