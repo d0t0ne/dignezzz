@@ -106,7 +106,7 @@ done < "$XRAY_CONFIG_FILE"
 
 uvi_port=$(grep -E "^UVICORN_PORT\s*=" "$ENV_FILE" | cut -d'=' -f2 | tr -d ' ')
 
-echo "UVICORN_PORT: $uvi_port\n"
+ printf "UVICORN_PORT: $uvi_port\n"
 
 ufw allow "$uvi_port"
 for port in "${found_ports[@]}"; do
