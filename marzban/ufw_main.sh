@@ -98,15 +98,15 @@ while IFS= read -r line; do
   if [[ "$line" == *"\"port\""* ]]; then
     port=$(printf "$line" | awk -F': ' '{print $2}' | tr -d '",')
     found_ports+=("$port")
-    printf "${GREEN}Найден inbound порт: $port ${NC}"
+    printf "${GREEN}Найден inbound порт: $port ${NC}\n"
   fi
 done < "$XRAY_CONFIG_FILE"
 
- printf "${YELLOW}Считываем параметр UVICORN_PORT из файла .env: ${NC}"
+ printf "${YELLOW}Считываем параметр UVICORN_PORT из файла .env: ${NC}\n"
 
 uvi_port=$(grep -E "^UVICORN_PORT\s*=" "$ENV_FILE" | cut -d'=' -f2 | tr -d ' ')
 
-echo "UVICORN_PORT: $uvi_port"
+echo "UVICORN_PORT: $uvi_port\n"
 
 ufw allow "$uvi_port"
 for port in "${found_ports[@]}"; do
