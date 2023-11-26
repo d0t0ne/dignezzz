@@ -98,11 +98,11 @@ while IFS= read -r line; do
   if [[ "$line" == *"\"port\""* ]]; then
     port=$(echo "$line" | awk -F': ' '{print $2}' | tr -d '",')
     found_ports+=("$port")
-    echo "${GREEN}Найден inbound порт: $port ${NC}"
+    printf "${GREEN}Найден inbound порт: $port ${NC}"
   fi
 done < "$XRAY_CONFIG_FILE"
 
-echo "${YELLOW}Считываем параметр UVICORN_PORT из файла .env: ${NC}"
+ printf "${YELLOW}Считываем параметр UVICORN_PORT из файла .env: ${NC}"
 
 uvi_port=$(grep -E "^UVICORN_PORT=" "$ENV_FILE" | cut -d'=' -f2)
 
@@ -118,5 +118,5 @@ sudo ufw --force disable
 sudo ufw --force enable
 
 
-echo "Правила добавлены успешно."
-echo "если вы используете собственные порты отличные от моих, добавьте их вручную, командой ${RED}ufw allow XXXXX ${NC} - где XXXXX ваш порт."
+ printf "Правила добавлены успешно."
+ printf "если вы используете собственные порты отличные от моих, добавьте их вручную, командой ${RED}ufw allow XXXXX ${NC} - где XXXXX ваш порт."
