@@ -96,7 +96,7 @@ fi
 found_ports=()
 while IFS= read -r line; do
   if [[ "$line" == *"\"port\""* ]]; then
-    port=$(printf "$line" | awk -F': ' '{print $2}' | tr -d '",')
+    port=$(echo "$line" | awk -F': ' '{print $2}' | tr -d '",')
     found_ports+=("$port")
     printf "${GREEN}Найден inbound порт: $port ${NC}\n"
   fi
@@ -121,4 +121,4 @@ sudo ufw --force enable
 
 
  printf "Правила добавлены успешно."
- printf "если вы используете собственные порты отличные от моих, добавьте их вручную, командой ${RED}ufw allow XXXXX ${NC} - где XXXXX ваш порт."
+ printf "если вы используете собственные порты отличные от моих, добавьте их вручную, командой ${RED}ufw allow XXXXX ${NC} - где XXXXX ваш порт.\n"
