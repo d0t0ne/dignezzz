@@ -52,7 +52,7 @@ if ! command -v sudo &> /dev/null; then
         printf "${YELLOW}Мы определили что у вас Debian, для скрипта нужен пакет SUDO, он будет установлен.${NC}\n"
         # Устанавливаем пакет sudo
         apt-get update
-        apt-get install sudo -y
+        apt-get install sudo -yqq
     printf "${GREEN}***********${NC}\n"
     printf "${GREEN}Sudo установлен. Продолжаем установку.${NC}\n"
     printf "${GREEN}***********${NC}\n"
@@ -76,7 +76,7 @@ if dpkg --get-selections | grep -q "^ufw[[:space:]]*install$" >/dev/null; then
 else
     # установка ufw
     sudo apt update
-    sudo apt install ufw -y
+    sudo apt install ufw -yqq
 fi
  # Считываем ssh порт из файла sshd_config
 SSH_PORT=$(grep -oP '(?<=Port )\d+' /etc/ssh/sshd_config)
