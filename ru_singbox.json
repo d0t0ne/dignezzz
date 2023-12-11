@@ -127,12 +127,6 @@
         "category-gov-ru"
       ],
         "outbound": "direct"
-      },
-      {
-        "geosite": [
-          "category-ads-all"
-        ],
-        "outbound": "block"
       }
     ],
     "auto_detect_interface": true,
