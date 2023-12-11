@@ -11,27 +11,27 @@
         "address": "udp://1.1.1.1",
         "address_resolver": "dns_direct",
         "strategy": "prefer_ipv4",
-        "detour": "PROXY"
+        "detour": "proxy"
       },
       {
         "tag": "dns_proxy_tcp",
         "address": "tcp://1.1.1.1",
         "address_resolver": "dns_direct",
         "strategy": "prefer_ipv4",
-        "detour": "PROXY"
+        "detour": "proxy"
       },
       {
         "tag": "dns_proxy",
         "address": "https://1.1.1.1/dns-query",
         "address_resolver": "dns_direct",
         "strategy": "prefer_ipv4",
-        "detour": "PROXY"
+        "detour": "proxy"
       },
       {
         "tag": "dns_direct",
         "address": "local",
         "strategy": "prefer_ipv4",
-        "detour": "DIRECT"
+        "detour": "direct"
       },
       {
         "tag": "dns_block",
@@ -67,13 +67,13 @@
   "outbounds": [
     {
       "type": "selector",
-      "tag": "PROXY",
+      "tag": "proxy",
       "interrupt_exist_connections": true,
       "outbounds": []
     },
     {
-      "type": "DIRECT",
-      "tag": "DIRECT"
+      "type": "direct",
+      "tag": "direct"
     },
     {
       "type": "block",
@@ -87,11 +87,11 @@
   "route": {
     "geoip": {
       "download_url": "https://github.com/Sagernet/sing-geoip/releases/latest/download/geoip.db",
-      "download_detour": "DIRECT"
+      "download_detour": "direct"
     },
     "geosite": {
       "download_url": "https://github.com/Sagernet/sing-geosite/releases/latest/download/geosite.db",
-      "download_detour": "DIRECT"
+      "download_detour": "direct"
     },
     "rules": [
       {
@@ -100,15 +100,15 @@
       },
       {
         "geosite": "private",
-        "outbound": "DIRECT"
+        "outbound": "direct"
       },
       {
         "geoip": "private",
-        "outbound": "DIRECT"
+        "outbound": "direct"
       },
       {
         "geoip": ["ru"],
-        "outbound": "DIRECT"
+        "outbound": "direct"
       },
       {
         "geosite": [
@@ -119,7 +119,7 @@
         "apple",
         "category-gov-ru"
       ],
-        "outbound": "DIRECT"
+        "outbound": "direct"
       },
       {
         "geosite": [
