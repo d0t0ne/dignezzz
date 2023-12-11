@@ -31,8 +31,7 @@
       }
     ],
     "fakeip": {
-      "inet4_range": "198.18.0.1/16",
-      "strategy": "lru"
+      "inet4_range": "198.18.0.1/16"
     },
     "independent_cache": false
   },
