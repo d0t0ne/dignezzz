@@ -72,6 +72,13 @@
       "outbounds": []
     },
     {
+      "type": "urltest",
+      "tag": "⚡️ Самый быстрый",
+      "outbounds": null,
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": "1m0s"
+    },
+    {
       "type": "direct",
       "tag": "direct"
     },
