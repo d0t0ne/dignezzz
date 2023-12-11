@@ -7,17 +7,31 @@
   "dns": {
     "servers": [
       {
+        "tag": "dns_proxy_udp",
+        "address": "udp://1.1.1.1",
+        "address_resolver": "dns_direct",
+        "strategy": "prefer_ipv4",
+        "detour": "PROXY"
+      },
+      {
+        "tag": "dns_proxy_tcp",
+        "address": "tcp://1.1.1.1",
+        "address_resolver": "dns_direct",
+        "strategy": "prefer_ipv4",
+        "detour": "PROXY"
+      },
+      {
         "tag": "dns_proxy",
         "address": "https://1.1.1.1/dns-query",
         "address_resolver": "dns_direct",
         "strategy": "prefer_ipv4",
-        "detour": "Proxy"
+        "detour": "PROXY"
       },
       {
         "tag": "dns_direct",
         "address": "local",
         "strategy": "prefer_ipv4",
-        "detour": "direct"
+        "detour": "DIRECT"
       },
       {
         "tag": "dns_block",
@@ -41,7 +55,8 @@
       "mtu": 9000,
       "interface_name": "tun125",
       "tag": "tun-in",
-      "inet4_address": "172.19.0.1/30"
+      "inet4_address": "172.19.0.1/30",
+      "inet6_address": "fdfe:dcba:9876::1/126",
       "auto_route": true,
       "strict_route": true,
       "endpoint_independent_nat": true,
@@ -52,13 +67,13 @@
   "outbounds": [
     {
       "type": "selector",
-      "tag": "Proxy",
+      "tag": "PROXY",
       "interrupt_exist_connections": true,
       "outbounds": []
     },
     {
-      "type": "direct",
-      "tag": "direct"
+      "type": "DIRECT",
+      "tag": "DIRECT"
     },
     {
       "type": "block",
@@ -72,11 +87,11 @@
   "route": {
     "geoip": {
       "download_url": "https://github.com/Sagernet/sing-geoip/releases/latest/download/geoip.db",
-      "download_detour": "direct"
+      "download_detour": "DIRECT"
     },
     "geosite": {
       "download_url": "https://github.com/Sagernet/sing-geosite/releases/latest/download/geosite.db",
-      "download_detour": "direct"
+      "download_detour": "DIRECT"
     },
     "rules": [
       {
@@ -85,39 +100,30 @@
       },
       {
         "geosite": "private",
-        "outbound": "direct"
+        "outbound": "DIRECT"
       },
       {
         "geoip": "private",
-        "outbound": "direct"
+        "outbound": "DIRECT"
       },
       {
         "geoip": ["ru"],
-        "outbound": "direct"
+        "outbound": "DIRECT"
       },
       {
         "geosite": [
         "google",
         "telegram",
+        "youtube",
         "whatsapp",
         "apple",
         "category-gov-ru"
       ],
-        "outbound": "direct"
+        "outbound": "DIRECT"
       },
       {
         "geosite": [
-          "category-ads-all",
-          "malware",
-          "phishing",
-          "cryptominers"
-        ],
-        "outbound": "block"
-      },
-      {
-        "geoip": [
-          "malware",
-          "phishing"
+          "category-ads-all"
         ],
         "outbound": "block"
       }
