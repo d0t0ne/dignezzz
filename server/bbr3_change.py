@@ -2,6 +2,7 @@
 
 import subprocess
 import re
+import platform
 
 # Константы
 TPUT = "tput"
@@ -10,6 +11,11 @@ BOLD = "bold"
 COLOR_GREEN = "2"
 COLOR_YELLOW = "3"
 CLEAR_SCREEN = "clear"
+
+# Проверка на Ubuntu
+if not 'Ubuntu' in platform.linux_distribution():
+    print("Этот скрипт предназначен для использования на Ubuntu. Выход.")
+    exit(1)
 
 # Функция для вывода сообщений
 def print_message(message, color):
@@ -26,8 +32,6 @@ def run_command(command):
         print_message(f"Ошибка выполнения команды '{command}': {e.output}", COLOR_YELLOW)
         exit(1)
     return result
-
-# Начинаем с чисого листа
 subprocess.run([CLEAR_SCREEN], shell=True)
 
 print('''
@@ -37,22 +41,15 @@ BBBB    Y       D  D  I  G  GG N N N EEE    Z     Z     Z
 B   B   Y       D  D  I  G   G N  NN E     Z     Z     Z    
 BBBB    Y       DDD  III  GGG  N   N EEEE ZZZZZ ZZZZZ ZZZZZ 
 
-Данный скрипт установит  XanMod + BBR3
+Данный скрипт установит модифицированное ядро XanMod + BBR3
 ''')
-
-
-# Ждем пару сек, что бы пользователь прочитал
 subprocess.run("sleep 4", shell=True)
 print_message("Определяем доступную версию ядра", COLOR_YELLOW)
-
-# Получение информации о CPU
 try:
     cpu_info = run_command("cat /proc/cpuinfo")
 except FileNotFoundError:
     print_message("Файл /proc/cpuinfo не найден", COLOR_YELLOW)
     exit(1)
-
-# Определение уровня поддержки
 level = None
 if re.search(r'lm|cmov|cx8|fpu|fxsr|mmx|syscall|sse2', cpu_info):
     level = 1
