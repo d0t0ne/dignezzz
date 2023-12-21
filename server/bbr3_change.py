@@ -13,20 +13,22 @@ CLEAR_SCREEN = "clear"
 
 # Функция для вывода сообщений
 def print_message(message, color):
-    subprocess.run([TPUT, SETAF, color])
+    command = f"{TPUT} {SETAF} {color}"
+    subprocess.run(command, shell=True)
     print(message)
-    subprocess.run([TPUT, "sgr0"])
+    subprocess.run(f"{TPUT} sgr0", shell=True)
 
 # Функция для выполнения команды и обработки вывода
 def run_command(command):
-    result = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    if result.returncode != 0:
-        print_message(f"Ошибка выполнения команды '{command}': {result.stderr}", COLOR_YELLOW)
+    try:
+        result = subprocess.check_output(command, shell=True, text=True)
+    except subprocess.CalledProcessError as e:
+        print_message(f"Ошибка выполнения команды '{command}': {e.output}", COLOR_YELLOW)
         exit(1)
-    return result.stdout
+    return result
 
 # Начинаем с чисого листа
-subprocess.run([CLEAR_SCREEN])
+subprocess.run([CLEAR_SCREEN], shell=True)
 
 print('''
 BBBB  Y   Y     DDD  III  GGG  N   N EEEE ZZZZZ ZZZZZ ZZZZZ 
@@ -40,11 +42,15 @@ BBBB    Y       DDD  III  GGG  N   N EEEE ZZZZZ ZZZZZ ZZZZZ
 
 
 # Ждем пару сек, что бы пользователь прочитал
-subprocess.run(["sleep", "4"])
+subprocess.run("sleep 4", shell=True)
 print_message("Определяем доступную версию ядра", COLOR_YELLOW)
 
 # Получение информации о CPU
-cpu_info = run_command("cat /proc/cpuinfo")
+try:
+    cpu_info = run_command("cat /proc/cpuinfo")
+except FileNotFoundError:
+    print_message("Файл /proc/cpuinfo не найден", COLOR_YELLOW)
+    exit(1)
 
 # Определение уровня поддержки
 level = None
