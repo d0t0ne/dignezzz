@@ -12,10 +12,15 @@ COLOR_GREEN = "2"
 COLOR_YELLOW = "3"
 CLEAR_SCREEN = "clear"
 
-# Проверка на Ubuntu
-if not 'Ubuntu' in platform.linux_distribution():
-    print("Этот скрипт предназначен для использования на Ubuntu. Выход.")
+try:
+    with open("/etc/os-release") as f:
+        if 'Ubuntu' not in f.read():
+            print("Этот скрипт предназначен для использования на Ubuntu. Выход.")
+            exit(1)
+except FileNotFoundError:
+    print("Не удалось определить дистрибутив Linux. Выход.")
     exit(1)
+
 
 # Функция для вывода сообщений
 def print_message(message, color):
