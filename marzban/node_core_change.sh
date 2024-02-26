@@ -5,6 +5,7 @@ if ! dpkg -s wget unzip >/dev/null 2>&1; then
   echo "Установка необходимых пакетов..."
   apt install -y wget unzip
 fi
+
 # Создаем папку /var/lib/marzban/xray-core
 mkdir -p /var/lib/marzban/xray-core
 # Переходим в папку /var/lib/marzban/xray-core
@@ -31,11 +32,15 @@ if [ -z "$marzban_node_dir" ]; then
   exit 1
 fi
 
-# Добавление строки XRAY_EXECUTABLE_PATH в каждое environment
-sed -i '/environment:/!b;n;/XRAY_EXECUTABLE_PATH/!a\      XRAY_EXECUTABLE_PATH: "/var/lib/marzban/xray-core/xray"' "$marzban_node_dir/docker-compose.yml"
+# Проверяем, существует ли уже строка XRAY_EXECUTABLE_PATH в файле docker-compose.yml
+if ! grep -q "XRAY_EXECUTABLE_PATH: \"/var/lib/marzban/xray-core/xray\"" "$marzban_node_dir/docker-compose.yml"; then
+  # Если строка отсутствует, добавляем ее
+  sed -i '/environment:/!b;n;/XRAY_EXECUTABLE_PATH/!a\      XRAY_EXECUTABLE_PATH: "/var/lib/marzban/xray-core/xray"' "$marzban_node_dir/docker-compose.yml"
+fi
+
 # Перезапускаем Marzban-node
 echo "Перезапуск Marzban..."
-cd $marzban_node_dir
+cd "$marzban_node_dir" || exit
 docker compose up -d --force-recreate
 
 echo "Обновление ядра на Marzban-node завершено. Ядро установлено версии $xray_version"
