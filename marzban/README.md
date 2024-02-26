@@ -7,3 +7,7 @@ bash <(wget -qO- https://dignezzz.github.io/marzban/ufw_main.sh)
 ```bash
 bash <(wget -qO- https://dignezzz.github.io/marzban/ufw_node.sh)
 ```
+## Смена ядра
+```bash
+bash <(wget -qO- https://dignezzz.github.io/marzban/core_change.sh)
+```
