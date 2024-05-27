@@ -42,7 +42,7 @@ B   B   Y       D  D  I  G   G N  NN E     Z     Z     Z
 BBBB    Y       DDD  III  GGG  N   N EEEE ZZZZZ ZZZZZ ZZZZZ 
                                                             
 MarzbanScript
-Visit: https://openode.ru
+Visit: https://openode.xyz
 '
 
 # Проверяем, установлен ли пакет sudo
