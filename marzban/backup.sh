@@ -24,7 +24,7 @@ DEST_DIR="/root"
 
 # Имя архива с датой и временем
 DATE=$(date +'%Y-%m-%d_%H-%M-%S')
-ARCHIVE_NAME="VsemVPN_backup_$DATE.zip"
+ARCHIVE_NAME="backup_$DATE.zip"
 ARCHIVE_PATH="$DEST_DIR/$ARCHIVE_NAME"
 
 # Имя файла дампа базы данных с датой и временем
