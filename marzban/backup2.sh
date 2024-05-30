@@ -28,7 +28,7 @@ BACKUP_DIR="/opt/marzban/backup"
 SERVER_IP=$(hostname -I | awk '{print $1}')
 DEST_DIR="/root"
 DATE=$(date +'%Y-%m-%d_%H-%M-%S')
-ARCHIVE_NAME="VsemVPN_backup_$DATE.zip"
+ARCHIVE_NAME="backup_$DATE.zip"
 ARCHIVE_PATH="$DEST_DIR/$ARCHIVE_NAME"
 TARGET_DIR="s3cf:dir/"
 
