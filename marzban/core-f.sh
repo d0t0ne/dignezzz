@@ -121,7 +121,7 @@ update_marzban_main() {
     # Перезапускаем Marzban
     marzban_name=$(basename "$marzban_folder")
     echo "Перезапуск ${marzban_name}..."
-    $marzban_name restart
+    $marzban_name restart -n
 
     echo "Установка завершена."
 }
