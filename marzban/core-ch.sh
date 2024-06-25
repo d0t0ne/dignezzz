@@ -28,7 +28,8 @@ echo '
 echo -e "\e[1m\e[33|Our community: https://openode.xyz\n\e[0m"
 sleep 2s
 
-echo -e "\e[1m\e[33mДанный скрипт устанавливает ядро Xray в Marzban и Marzban Node\n\e[0m"
+echo -e "\e[1m\e[33mДанный скрипт устанавливает ядро Xray в Marzban и Marzban Node. \n\e[0m"
+echo -e "\e[1m\e[33mЕсли у вас установлен Marzban Main не по дефолтному адресу и с измененным именем сервиса - используйте 3ю опцию!\n\e[0m"
 sleep 1
 
 # Проверяем операционную систему
