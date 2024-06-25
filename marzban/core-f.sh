@@ -158,10 +158,21 @@ fi
     echo "Обновление ядра на Marzban-node завершено. Ядро установлено версии $xray_version"
 }
 
+# Функция для поиска всех установленных Marzban Main
+find_marzban_main() {
+  marzban_main_dirs=($(find / -type f -path "*/docker-compose.yml" -exec sh -c 'test -f "${0%/*}/.env" && grep -q "marzban" "${0%/*}/.env" && echo "${0%/*}"' {} \;))
+  
+  echo "Найдены следующие пути для установки Marzban Main:"
+  for dir in "${marzban_main_dirs[@]}"; do
+    echo "$dir"
+  done
+}
+
 # Печатаем доступные опции для пользователя
 echo "Выберите Marzban, для которого необходимо обновить ядро:"
 echo "1. Marzban Main"
 echo "2. Marzban Node"
+echo "3. Найти все установленные Marzban Main"
 
 # Запрос на выбор опции у пользователя
 read -p "Введите номер выбранной опции: " option
@@ -174,7 +185,10 @@ case $option in
     2)
         update_marzban_node
         ;;
+    3)
+        find_marzban_main
+        ;;
     *)
-        echo "Неверный выбор. Выберите 1 или 2."
+        echo "Неверный выбор. Выберите 1, 2 или 3."
         ;;
 esac
