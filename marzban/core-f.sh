@@ -108,11 +108,11 @@ rm "${xray_filename}"
 update_marzban_main() {
 get_xray_core
 # Изменение ядра Marzban
-marzban_folder="/opt/marzban"
+marzban_folder="$1"
 marzban_env_file="${marzban_folder}/.env"
 xray_executable_path='XRAY_EXECUTABLE_PATH="/var/lib/marzban/xray-core/xray"'
 
-echo "Изменение ядра Marzban..."
+echo "Изменение ядра Marzban в папке $marzban_folder..."
 # Проверяем, существует ли уже строка XRAY_EXECUTABLE_PATH в файле .env
 if ! grep -q "^${xray_executable_path}" "$marzban_env_file"; then
   # Если строка отсутствует, добавляем ее
@@ -132,7 +132,7 @@ update_marzban_node() {
 get_xray_core
 
     # Поиск пути до папки Marzban-node и файла docker-compose.yml
-    marzban_node_dir=$(find / -type d -name "Marzban-node" -exec test -f "{}/docker-compose.yml" \; -print -quit)
+    marzban_node_dir=$(find /opt/ -type d -name "Marzban-node" -exec test -f "{}/docker-compose.yml" \; -print -quit)
 
     if [ -z "$marzban_node_dir" ]; then
         echo "Папка Marzban-node с файлом docker-compose.yml не найдена"
@@ -160,12 +160,30 @@ fi
 
 # Функция для поиска всех установленных Marzban Main
 find_marzban_main() {
-  marzban_main_dirs=($(find / -type f -path "*/docker-compose.yml" -exec sh -c 'test -f "${0%/*}/.env" && grep -q "marzban" "${0%/*}/.env" && echo "${0%/*}"' {} \;))
+  marzban_main_dirs=($(find /opt/ -type f -path "*/docker-compose.yml" -exec sh -c 'test -f "${0%/*}/.env" && grep -q "marzban" "${0%/*}/.env" && echo "${0%/*}"' {} \;))
   
+  if [ ${#marzban_main_dirs[@]} -eq 0 ]; then
+    echo "Не найдено ни одного Marzban Main в /opt/"
+    exit 1
+  fi
+
   echo "Найдены следующие пути для установки Marzban Main:"
-  for dir in "${marzban_main_dirs[@]}"; do
-    echo "$dir"
+  for i in "${!marzban_main_dirs[@]}"; do
+    echo "$((i + 1)): ${marzban_main_dirs[$i]}"
   done
+
+  # Предлагаем пользователю выбрать путь
+  printf "Выберите путь для установки (1-${#marzban_main_dirs[@]}): "
+  read choice
+
+  # Проверяем, что выбор пользователя в пределах доступных путей
+  if [ "$choice" -lt 1 ] || [ "$choice" -gt "${#marzban_main_dirs[@]}" ]; then
+    echo "Неверный выбор."
+    exit 1
+  fi
+
+  # Вызываем функцию обновления ядра для выбранного пути
+  update_marzban_main "${marzban_main_dirs[$((choice - 1))]}"
 }
 
 # Печатаем доступные опции для пользователя
@@ -180,7 +198,8 @@ read -p "Введите номер выбранной опции: " option
 # Проверяем выбор пользователя и вызываем соответствующую функцию
 case $option in
     1)  
-        update_marzban_main
+        marzban_folder="/opt/marzban"
+        update_marzban_main "$marzban_folder"
         ;;
     2)
         update_marzban_node
