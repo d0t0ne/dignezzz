@@ -107,10 +107,11 @@ get_xray_core() {
 # Функция для обновления ядра Marzban Main
 update_marzban_main() {
     local marzban_folder=$1
-    get_xray_core "$marzban_folder"
+    local var_lib_folder="/var/lib/$(basename $marzban_folder)"
+    get_xray_core "$var_lib_folder"
     # Изменение ядра Marzban
     marzban_env_file="${marzban_folder}/.env"
-    xray_executable_path="XRAY_EXECUTABLE_PATH=\"${marzban_folder}/xray-core/xray\""
+    xray_executable_path="XRAY_EXECUTABLE_PATH=\"${var_lib_folder}/xray-core/xray\""
 
     echo "Изменение ядра Marzban в папке $marzban_folder..."
     # Проверяем, существует ли уже строка XRAY_EXECUTABLE_PATH в файле .env
