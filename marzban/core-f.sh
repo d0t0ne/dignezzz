@@ -45,7 +45,6 @@ fi
 
 # Функция загрузки файла
 get_xray_core() {
-    local install_dir=$1
     # Отправляем запрос к GitHub API для получения информации о последних четырех релизах
     latest_releases=$(curl -s "https://api.github.com/repos/XTLS/Xray-core/releases?per_page=4")
 
@@ -87,9 +86,9 @@ get_xray_core() {
     fi
 
     # Создаем папку для установки xray-core
-    mkdir -p "$install_dir/xray-core"
+    mkdir -p "/var/lib/marzban/xray-core"
     # Переходим в папку для установки xray-core
-    cd "$install_dir/xray-core"
+    cd "/var/lib/marzban/xray-core"
 
     # Скачиваем Xray-core выбранной версии
     xray_filename="Xray-linux-64.zip"
@@ -107,11 +106,10 @@ get_xray_core() {
 # Функция для обновления ядра Marzban Main
 update_marzban_main() {
     local marzban_folder=$1
-    local var_lib_folder="/var/lib/$(basename $marzban_folder)"
-    get_xray_core "$var_lib_folder"
+    get_xray_core
     # Изменение ядра Marzban
     marzban_env_file="${marzban_folder}/.env"
-    xray_executable_path="XRAY_EXECUTABLE_PATH=\"${var_lib_folder}/xray-core/xray\""
+    xray_executable_path="XRAY_EXECUTABLE_PATH=\"/var/lib/marzban/xray-core/xray\""
 
     echo "Изменение ядра Marzban в папке $marzban_folder..."
     # Проверяем, существует ли уже строка XRAY_EXECUTABLE_PATH в файле .env
@@ -130,7 +128,7 @@ update_marzban_main() {
 
 # Функция для обновления ядра Marzban Node
 update_marzban_node() {
-    get_xray_core "/var/lib/marzban"
+    get_xray_core
 
     # Поиск пути до папки Marzban-node и файла docker-compose.yml
     marzban_node_dir=$(find /opt/ -type d -name "Marzban-node" -exec test -f "{}/docker-compose.yml" \; -print -quit)
