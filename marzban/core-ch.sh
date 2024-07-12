@@ -37,7 +37,6 @@ if [[ $(uname) != "Linux" ]];then
     echo "Этот скрипт предназначен только для Linux"
     exit 1
 fi
-
 # Проверяем архитектуру
 if [[ $(uname -m) != "x86_64" ]]; then
     echo "Этот скрипт предназначен только для архитектуры x64"
@@ -46,6 +45,8 @@ fi
 
 # Функция загрузки файла
 get_xray_core() {
+    local install_folder=$1
+
     # Отправляем запрос к GitHub API для получения информации о последних четырех релизах
     latest_releases=$(curl -s "https://api.github.com/repos/XTLS/Xray-core/releases?per_page=4")
 
@@ -63,7 +64,7 @@ get_xray_core() {
     read choice
 
     # Проверяем, был ли сделан выбор пользователем
-    if [ -z "$choice" ];then
+    if [ -z "$choice" ]; then
         choice="1"  # Выбираем самую свежую версию по умолчанию
     fi
 
@@ -87,9 +88,9 @@ get_xray_core() {
     fi
 
     # Создаем папку для установки xray-core
-    mkdir -p "/var/lib/marzban/xray-core"
+    mkdir -p "$install_folder/xray-core"
     # Переходим в папку для установки xray-core
-    cd "/var/lib/marzban/xray-core"
+    cd "$install_folder/xray-core"
 
     # Скачиваем Xray-core выбранной версии
     xray_filename="Xray-linux-64.zip"
@@ -107,10 +108,11 @@ get_xray_core() {
 # Функция для обновления ядра Marzban Main
 update_marzban_main() {
     local marzban_folder=$1
-    get_xray_core
+    local xray_folder=$2
+    get_xray_core "$xray_folder"
     # Изменение ядра Marzban
     marzban_env_file="${marzban_folder}/.env"
-    xray_executable_path="XRAY_EXECUTABLE_PATH=\"/var/lib/marzban/xray-core/xray\""
+    xray_executable_path="XRAY_EXECUTABLE_PATH=\"${xray_folder}/xray-core/xray\""
 
     echo "Изменение ядра Marzban в папке $marzban_folder..."
     # Проверяем, существует ли уже строка XRAY_EXECUTABLE_PATH в файле .env
@@ -129,7 +131,8 @@ update_marzban_main() {
 
 # Функция для обновления ядра Marzban Node
 update_marzban_node() {
-    get_xray_core
+    local xray_folder="/var/lib/marzban"
+    get_xray_core "$xray_folder"
 
     # Поиск пути до папки Marzban-node и файла docker-compose.yml
     marzban_node_dir=$(find /opt/ -type d -name "Marzban-node" -exec test -f "{}/docker-compose.yml" \; -print -quit)
@@ -140,14 +143,14 @@ update_marzban_node() {
     fi
 
     # Проверяем, существует ли уже строка XRAY_EXECUTABLE_PATH в файле docker-compose.yml
-    if ! grep -q "XRAY_EXECUTABLE_PATH: \"/var/lib/marzban/xray-core/xray\"" "$marzban_node_dir/docker-compose.yml"; then
+    if ! grep -q "XRAY_EXECUTABLE_PATH: \"${xray_folder}/xray-core/xray\"" "$marzban_node_dir/docker-compose.yml"; then
         # Если строка отсутствует, добавляем ее
-        sed -i '/environment:/!b;n;/XRAY_EXECUTABLE_PATH/!a\      XRAY_EXECUTABLE_PATH: "/var/lib/marzban/xray-core/xray"' "$marzban_node_dir/docker-compose.yml"
+        sed -i '/environment:/!b;n;/XRAY_EXECUTABLE_PATH/!a\      XRAY_EXECUTABLE_PATH: "'${xray_folder}'/xray-core/xray"' "$marzban_node_dir/docker-compose.yml"
     fi
     # Проверяем, существует ли уже строка /var/lib/marzban:/var/lib/marzban в файле docker-compose.yml
-    if ! grep -q "^\s*- /var/lib/marzban:/var/lib/marzban\s*$" "$marzban_node_dir/docker-compose.yml"; then
+    if ! grep -q "^\s*- ${xray_folder}:${xray_folder}\s*$" "$marzban_node_dir/docker-compose.yml"; then
         # Если строка отсутствует, добавляем ее
-        sed -i '/volumes:/!b;n;/^- \/var\/lib\/marzban:\/var\/lib\/marzban/!a\      - \/var\/lib\/marzban:\/var\/lib\/marzban' "$marzban_node_dir/docker-compose.yml"
+        sed -i '/volumes:/!b;n;/^- \/var\/lib\/marzban:\/var\/lib\/marzban/!a\      - '${xray_folder}':'${xray_folder}'' "$marzban_node_dir/docker-compose.yml"
     fi
 
     # Перезапускаем Marzban-node
@@ -182,8 +185,11 @@ find_marzban_main() {
         exit 1
     fi
 
+    local selected_dir="${marzban_main_dirs[$((choice - 1))]}"
+    local var_marzban_xray_folder="/var/lib/$(basename "$selected_dir")"
+    
     # Вызываем функцию обновления ядра для выбранного пути
-    update_marzban_main "${marzban_main_dirs[$((choice - 1))]}"
+    update_marzban_main "$selected_dir" "$var_marzban_xray_folder"
 }
 
 # Печатаем доступные опции для пользователя
@@ -199,7 +205,8 @@ read -p "Введите номер выбранной опции: " option
 case $option in
     1)  
         marzban_folder="/opt/marzban"
-        update_marzban_main "$marzban_folder"
+        var_marzban_xray_folder="/var/lib/marzban"
+        update_marzban_main "$marzban_folder" "$var_marzban_xray_folder"
         ;;
     2)
         update_marzban_node
