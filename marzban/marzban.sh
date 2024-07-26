@@ -123,7 +123,7 @@ install_docker() {
 
 install_marzban_script() {
     FETCH_REPO="DigneZzZ/dignezzz.github.io"
-    SCRIPT_URL="https://github.com/$FETCH_REPO/raw/main/marzban/marzban.shh"
+    SCRIPT_URL="https://github.com/$FETCH_REPO/raw/main/marzban/marzban.sh"
     colorized_echo blue "Installing marzban script"
     curl -sSL $SCRIPT_URL | install -m 755 /dev/stdin /usr/local/bin/marzban
     colorized_echo green "marzban script installed successfully"
@@ -154,7 +154,7 @@ install_marzban() {
 
     if [ "$USE_MARIADB" = true ]; then
         echo "Adding MariaDB configuration to docker-compose.yml"
-        sed -i '/- \/var\/lib\/marzban:\/var\/lib\/marzban/a \ \ depends_on:\n \ \ \ \ - mysql' "$docker_file_path"
+        sed -i '/- \/var\/lib\/marzban:\/var\/lib\/marzban/a \ \ \ \ depends_on:\n \ \ \ \ \ \ - mysql' "$docker_file_path"
         cat <<EOL >> "$docker_file_path"
   mysql:
     image: mariadb:lts
@@ -179,7 +179,7 @@ EOL
 
     if [ "$USE_MYSQL" = true ]; then
         echo "Adding MySQL configuration to docker-compose.yml"
-        sed -i '/- \/var\/lib\/marzban:\/var\/lib\/marzban/a \ \ depends_on:\n \ \ \ \ - mysql' "$docker_file_path"
+        sed -i '/- \/var\/lib\/marzban:\/var\/lib\/marzban/a \ \ \ \ depends_on:\n \ \ \ \ \ \ - mysql' "$docker_file_path"
         cat <<EOL >> "$docker_file_path"
   mysql:
     image: mysql:8.3
