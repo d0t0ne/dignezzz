@@ -131,12 +131,16 @@ install_marzban_script() {
 
 install_marzban() {
     local marzban_version=$1
+    echo "Installing Marzban version: $marzban_version"
+    echo "Using development branch: $USE_DEV_BRANCH"
+
     # Determine the branch to use
     local branch="master"
     if [ "$USE_DEV_BRANCH" = true ]; then
         branch="dev"
     fi
 
+    echo "Fetching files from branch: $branch"
     FILES_URL_PREFIX="https://raw.githubusercontent.com/Gozargah/Marzban/$branch"
 
     mkdir -p "$DATA_DIR"
@@ -145,12 +149,21 @@ install_marzban() {
     colorized_echo blue "Fetching compose file from branch $branch"
     curl -sL "$FILES_URL_PREFIX/docker-compose.yml" -o "$APP_DIR/docker-compose.yml"
     docker_file_path="$APP_DIR/docker-compose.yml"
+
+    echo "docker-compose.yml before modification:"
+    cat "$docker_file_path"
+
     # install requested version
     if [ "$marzban_version" == "latest" ]; then
+        echo "Setting Marzban version to latest in docker-compose.yml"
         sed -i "s|image: gozargah/marzban:.*|image: gozargah/marzban:latest|g" "$docker_file_path"
     else
+        echo "Setting Marzban version to $marzban_version in docker-compose.yml"
         sed -i "s|image: gozargah/marzban:.*|image: gozargah/marzban:${marzban_version}|g" "$docker_file_path"
     fi
+
+    echo "docker-compose.yml after modification:"
+    cat "$docker_file_path"
 
     if [ "$USE_MARIADB" = true ]; then
         echo "Adding MariaDB configuration to docker-compose.yml"
