@@ -13,6 +13,7 @@ LAST_XRAY_CORES=5
 USE_MARIADB=false
 USE_MYSQL=false
 USE_DEV_BRANCH=false
+USE_VERSION_SELECTION=false
 
 colorized_echo() {
     local color=$1
@@ -48,11 +49,11 @@ detect_os() {
     # Detect the operating system
     if [ -f /etc/lsb-release ]; then
         OS=$(lsb_release -si)
-        elif [ -f /etc/os-release ]; then
+    elif [ -f /etc/os-release ]; then
         OS=$(awk -F= '/^NAME/{print $2}' /etc/os-release | tr -d '"')
-        elif [ -f /etc/redhat-release ]; then
+    elif [ -f /etc/redhat-release ]; then
         OS=$(cat /etc/redhat-release | awk '{print $1}')
-        elif [ -f /etc/arch-release ]; then
+    elif [ -f /etc/arch-release ]; then
         OS="Arch"
     else
         colorized_echo red "Unsupported operating system"
@@ -65,14 +66,14 @@ detect_and_update_package_manager() {
     if [[ "$OS" == "Ubuntu"* ]] || [[ "$OS" == "Debian"* ]]; then
         PKG_MANAGER="apt-get"
         $PKG_MANAGER update
-        elif [[ "$OS" == "CentOS"* ]] || [[ "$OS" == "AlmaLinux"* ]]; then
+    elif [[ "$OS" == "CentOS"* ]] || [[ "$OS" == "AlmaLinux"* ]]; then
         PKG_MANAGER="yum"
         $PKG_MANAGER update -y
         $PKG_MANAGER install -y epel-release
-        elif [ "$OS" == "Fedora"* ]; then
+    elif [ "$OS" == "Fedora"* ]; then
         PKG_MANAGER="dnf"
         $PKG_MANAGER update
-        elif [ "$OS" == "Arch" ]; then
+    elif [ "$OS" == "Arch" ]; then
         PKG_MANAGER="pacman"
         $PKG_MANAGER -Sy
     else
@@ -85,7 +86,7 @@ detect_compose() {
     # Check if docker compose command exists
     if docker compose >/dev/null 2>&1; then
         COMPOSE='docker compose'
-        elif docker-compose >/dev/null 2>&1; then
+    elif docker-compose >/dev/null 2>&1; then
         COMPOSE='docker-compose'
     else
         colorized_echo red "docker compose not found"
@@ -102,11 +103,11 @@ install_package () {
     colorized_echo blue "Installing $PACKAGE"
     if [[ "$OS" == "Ubuntu"* ]] || [[ "$OS" == "Debian"* ]]; then
         $PKG_MANAGER -y install "$PACKAGE"
-        elif [[ "$OS" == "CentOS"* ]] || [[ "$OS" == "AlmaLinux"* ]]; then
+    elif [[ "$OS" == "CentOS"* ]] || [[ "$OS" == "AlmaLinux"* ]]; then
         $PKG_MANAGER install -y "$PACKAGE"
-        elif [ "$OS" == "Fedora"* ]; then
+    elif [ "$OS" == "Fedora"* ]; then
         $PKG_MANAGER install -y "$PACKAGE"
-        elif [ "$OS" == "Arch" ]; then
+    elif [ "$OS" == "Arch" ]; then
         $PKG_MANAGER -S --noconfirm "$PACKAGE"
     else
         colorized_echo red "Unsupported operating system"
@@ -242,8 +243,6 @@ EOL
     colorized_echo green "Marzban's files downloaded successfully from branch $branch"
 }
 
-
-
 uninstall_marzban_script() {
     if [ -f "/usr/local/bin/marzban" ]; then
         colorized_echo yellow "Removing marzban script"
@@ -298,7 +297,6 @@ marzban_cli() {
     $COMPOSE -f $COMPOSE_FILE -p "$APP_NAME" exec -e CLI_PROG_NAME="marzban cli" marzban marzban-cli "$@"
 }
 
-
 update_marzban_script() {
     FETCH_REPO="Gozargah/Marzban-scripts"
     SCRIPT_URL="https://github.com/$FETCH_REPO/raw/master/marzban.sh"
@@ -326,6 +324,31 @@ is_marzban_up() {
         return 0
     fi
 }
+
+get_versions() {
+    local versions=($(curl -s "https://api.github.com/repos/Gozargah/Marzban/releases?per_page=6" | grep -oP '"tag_name": "\K(.*?)(?=")'))
+    echo "${versions[@]}"
+}
+
+select_version() {
+    local versions=("$@")
+    echo "Available Marzban versions:"
+    for i in "${!versions[@]}"; do
+        echo "$((i+1)): ${versions[$i]}"
+    done
+
+    local choice
+    while true; do
+        read -p "Choose a version to install (1-${#versions[@]}): " choice
+        if [[ "$choice" =~ ^[1-9][0-9]*$ ]] && [ "$choice" -le "${#versions[@]}" ]; then
+            echo "${versions[$((choice-1))]}"
+            return 0
+        else
+            echo "Invalid choice. Please try again."
+        fi
+    done
+}
+
 install_command() {
     check_running_as_root
     # Check if marzban is already installed
@@ -349,41 +372,20 @@ install_command() {
     fi
     detect_compose
     install_marzban_script
-    # Function to check if a version exists in the GitHub releases
-    check_version_exists() {
-        local version=$1
-        repo_url="https://api.github.com/repos/Gozargah/Marzban/releases"
-        if [ "$version" == "latest" ]; then
-            return 0
-        fi
 
-        # Fetch the release data from GitHub API
-        response=$(curl -s "$repo_url")
-
-        # Check if the response contains the version tag
-        if echo "$response" | jq -e ".[] | select(.tag_name == \"${version}\")" > /dev/null; then
-            return 0
-        else
-            return 1
-        fi
-    }
-    # Check if the version is valid and exists
-    if [[ "$1" == "latest" || "$1" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        if check_version_exists "$1"; then
-                install_marzban "$1"
-            echo "Installing $1 version"
-        else
-            echo "Version $1 does not exist. Please enter a valid version (e.g. v0.5.2)"
-            exit 1
-        fi
+    if [ "$USE_VERSION_SELECTION" = true ]; then
+        versions=($(get_versions))
+        marzban_version=$(select_version "${versions[@]}")
+        install_marzban "$marzban_version"
+    elif [ "$USE_DEV_BRANCH" = true ]; then
+        install_marzban ""
     else
-        echo "Invalid version format. Please enter a valid version (e.g. v0.5.2)"
-        exit 1
+        install_marzban "${1:-latest}"
     fi
+
     up_marzban
     follow_marzban_logs
 }
-
 
 uninstall_command() {
     check_running_as_root
@@ -464,7 +466,6 @@ up_command() {
 }
 
 down_command() {
-
     # Check if marzban is installed
     if ! is_marzban_installed; then
         colorized_echo red "Marzban's not installed!"
@@ -525,7 +526,6 @@ restart_command() {
 }
 
 status_command() {
-
     # Check if marzban is installed
     if ! is_marzban_installed; then
         echo -n "Status: "
@@ -646,7 +646,6 @@ update_command() {
     colorized_echo blue "Marzban updated successfully"
 }
 
-
 identify_the_operating_system_and_architecture() {
     if [[ "$(uname)" == 'Linux' ]]; then
         case "$(uname -m)" in
@@ -766,8 +765,6 @@ get_xray_core() {
     rm "${xray_filename}"
 }
 
-
-
 # Function to update the Marzban Main core
 update_core_command() {
     check_running_as_root
@@ -822,25 +819,36 @@ case "$1" in
     shift; cli_command "$@";;
     install)
         shift
-        if [[ "$1" == "--mariadb" ]]; then
-            USE_MARIADB=true
-            shift
-        fi
-        if [[ "$1" == "--mysql" ]]; then
-            USE_MYSQL=true
-            shift
-        fi
-        if [[ "$1" == "--dev" ]]; then
-            USE_DEV_BRANCH=true
-            shift
-        fi
+        while [[ "$1" == "--mariadb" || "$1" == "--mysql" || "$1" == "--dev" || "$1" == "--v" ]]; do
+            case "$1" in
+                --mariadb)
+                    USE_MARIADB=true
+                    shift
+                    ;;
+                --mysql)
+                    USE_MYSQL=true
+                    shift
+                    ;;
+                --dev)
+                    if [ "$USE_VERSION_SELECTION" = true ]; then
+                        colorized_echo red "Error: --dev and --v cannot be used together."
+                        exit 1
+                    fi
+                    USE_DEV_BRANCH=true
+                    shift
+                    ;;
+                --v)
+                    if [ "$USE_DEV_BRANCH" = true ]; then
+                        colorized_echo red "Error: --dev and --v cannot be used together."
+                        exit 1
+                    fi
+                    USE_VERSION_SELECTION=true
+                    shift
+                    ;;
+            esac
+        done
 
-        # Determine the version to install
-        if [ "$USE_DEV_BRANCH" = true ] && [ -z "$1" ]; then
-            install_command ""
-        else
-            install_command "${1:-latest}"
-        fi
+        install_command "$@"
     ;;
     update)
     shift; update_command "$@";;
