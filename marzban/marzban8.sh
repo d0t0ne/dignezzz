@@ -337,6 +337,9 @@ select_version() {
         echo "$((i+1)): ${VERSIONS[$i]}"
     done
 
+    # Сброс буфера вывода
+    (>&1 printf "\n")
+    
     local choice
     while true; do
         read -p "Choose a version to install (1-${#VERSIONS[@]}): " choice
