@@ -131,200 +131,6 @@ install_marzban_script() {
 
 install_marzban() {
     local marzban_version=$1
-    echo "Installing Marzban version: $marzban_version"
-    echo "Using development branch: $USE_DEV_BRANCH"
-
-    # Determine the branch to use
-    local branch="master"
-    if [ "$USE_DEV_BRANCH" = true ]; then
-        branch="dev"
-    fi
-
-    echo "Fetching files from branch: $branch"
-    FILES_URL_PREFIX="https://raw.githubusercontent.com/Gozargah/Marzban/$branch"
-
-    mkdir -p "$DATA_DIR"
-    mkdir -p "$APP_DIR"
-
-    colorized_echo blue "Fetching compose file from branch $branch"
-    curl -sL "$FILES_URL_PREFIX/docker-compose.yml" -o "$APP_DIR/docker-compose.yml"
-    docker_file_path="$APP_DIR/docker-compose.yml"
-
-    echo "docker-compose.yml before modification:"
-    cat "$docker_file_path"
-
-    # install requested version
-    if [ "$marzban_version" == "latest" ]; then
-        echo "Setting Marzban version to latest in docker-compose.yml"
-        sed -i "s|image: gozargah/marzban:.*|image: gozargah/marzban:latest|g" "$docker_file_path"
-    else
-        echo "Setting Marzban version to $marzban_version in docker-compose.yml"
-        sed -i "s|image: gozargah/marzban:.*|image: gozargah/marzban:${marzban_version}|g" "$docker_file_path"
-    fi
-
-    echo "docker-compose.yml after modification:"
-    cat "$docker_file_path"
-
-    if [ "$USE_MARIADB" = true ]; then
-        echo "Adding MariaDB configuration to docker-compose.yml"
-        sed -i '/- \/var\/lib\/marzban:\/var\/lib\/marzban/a \ \ \ \ depends_on:\n \ \ \ \ \ \ - mysql' "$docker_file_path"
-        cat <<EOL >> "$docker_file_path"
-  mysql:
-    image: mariadb:lts
-    environment:
-      MYSQL_ROOT_PASSWORD: my-root-password
-      MYSQL_ROOT_HOST: '%'
-      MYSQL_DATABASE: marzban
-      MYSQL_USER: marzban
-      MYSQL_PASSWORD: password
-    network_mode: host
-    command:
-      - --bind-address=127.0.0.1
-      - --character_set_server=utf8mb4
-      - --collation_server=utf8mb4_unicode_ci
-      - --host-cache-size=0
-      - --innodb-open-files=1024
-      - --innodb-buffer-pool-size=268435456
-    volumes:
-      - /var/lib/marzban/mysql:/var/lib/mysql
-EOL
-    fi
-
-    if [ "$USE_MYSQL" = true ]; then
-        echo "Adding MySQL configuration to docker-compose.yml"
-        sed -i '/- \/var\/lib\/marzban:\/var\/lib\/marzban/a \ \ \ \ depends_on:\n \ \ \ \ \ \ - mysql' "$docker_file_path"
-        cat <<EOL >> "$docker_file_path"
-  mysql:
-    image: mysql:8.3
-    environment:
-      MYSQL_ROOT_PASSWORD: my-root-password
-      MYSQL_ROOT_HOST: '%'
-      MYSQL_DATABASE: marzban
-      MYSQL_USER: marzban
-      MYSQL_PASSWORD: password
-    network_mode: host
-    command:
-      - --mysqlx=OFF
-      - --bind-address=127.0.0.1
-      - --character_set_server=utf8mb4
-      - --collation_server=utf8mb4_unicode_ci
-      - --disable-log-bin
-      - --host-cache-size=0
-      - --innodb-open-files=1024
-      - --innodb-buffer-pool-size=268435456
-    volumes:
-      - /var/lib/marzban/mysql:/var/lib/mysql
-EOL
-    fi
-
-    colorized_echo green "File saved in $APP_DIR/docker-compose.yml"
-
-    colorized_echo blue "Fetching .env file from branch $branch"
-    curl -sL "$FILES_URL_PREFIX/.env.example" -o "$APP_DIR/.env"
-    sed -i 's/^# \(XRAY_JSON = .*\)$/\1/' "$APP_DIR/.env"
-    sed -i 's/^# \(SQLALCHEMY_DATABASE_URL = .*\)$/\1/' "$APP_DIR/.env"
-
-    if [ "$USE_MARIADB" = true ] || [ "$USE_MYSQL" = true ]; then
-        sed -i 's~\(SQLALCHEMY_DATABASE_URL = \).*~\1"mysql+pymysql://marzban:password@127.0.0.1:3306/marzban"~' "$APP_DIR/.env"
-    else
-        sed -i 's~\(SQLALCHEMY_DATABASE_URL = \).*~\1"sqlite:////var/lib/marzban/db.sqlite3"~' "$APP_DIR/.env"
-    fi
-
-    sed -i 's~\(XRAY_JSON = \).*~\1"/var/lib/marzban/xray_config.json"~' "$APP_DIR/.env"
-    colorized_echo green "File saved in $APP_DIR/.env"
-
-    colorized_echo blue "Fetching xray config file from branch $branch"
-    curl -sL "$FILES_URL_PREFIX/xray_config.json" -o "$DATA_DIR/xray_config.json"
-    colorized_echo green "File saved in $DATA_DIR/xray_config.json"
-
-    colorized_echo green "Marzban's files downloaded successfully from branch $branch"
-}
-
-
-uninstall_marzban_script() {
-    if [ -f "/usr/local/bin/marzban" ]; then
-        colorized_echo yellow "Removing marzban script"
-        rm "/usr/local/bin/marzban"
-    fi
-}
-
-uninstall_marzban() {
-    if [ -d "$APP_DIR" ]; then
-        colorized_echo yellow "Removing directory: $APP_DIR"
-        rm -r "$APP_DIR"
-    fi
-}
-
-uninstall_marzban_docker_images() {
-    images=$(docker images | grep marzban | awk '{print $3}')
-
-    if [ -n "$images" ]; then
-        colorized_echo yellow "Removing Docker images of Marzban"
-        for image in $images; do
-            if docker rmi "$image" >/dev/null 2>&1; then
-                colorized_echo yellow "Image $image removed"
-            fi
-        done
-    fi
-}
-
-uninstall_marzban_data_files() {
-    if [ -d "$DATA_DIR" ]; then
-        colorized_echo yellow "Removing directory: $DATA_DIR"
-        rm -r "$DATA_DIR"
-    fi
-}
-
-up_marzban() {
-    $COMPOSE -f $COMPOSE_FILE -p "$APP_NAME" up -d --remove-orphans
-}
-
-down_marzban() {
-    $COMPOSE -f $COMPOSE_FILE -p "$APP_NAME" down
-}
-
-show_marzban_logs() {
-    $COMPOSE -f $COMPOSE_FILE -p "$APP_NAME" logs
-}
-
-follow_marzban_logs() {
-    $COMPOSE -f $COMPOSE_FILE -p "$APP_NAME" logs -f
-}
-
-marzban_cli() {
-    $COMPOSE -f $COMPOSE_FILE -p "$APP_NAME" exec -e CLI_PROG_NAME="marzban cli" marzban marzban-cli "$@"
-}
-
-
-update_marzban_script() {
-    FETCH_REPO="Gozargah/Marzban-scripts"
-    SCRIPT_URL="https://github.com/$FETCH_REPO/raw/master/marzban.sh"
-    colorized_echo blue "Updating marzban script"
-    curl -sSL $SCRIPT_URL | install -m 755 /dev/stdin /usr/local/bin/marzban
-    colorized_echo green "marzban script updated successfully"
-}
-
-update_marzban() {
-    $COMPOSE -f $COMPOSE_FILE -p "$APP_NAME" pull
-}
-
-is_marzban_installed() {
-    if [ -d $APP_DIR ]; then
-        return 0
-    else
-        return 1
-    fi
-}
-
-is_marzban_up() {
-    if [ -z "$($COMPOSE -f $COMPOSE_FILE ps -q -a)" ]; then
-        return 1
-    else
-        return 0
-    fi
-}
-install_marzban() {
-    local marzban_version=$1
     echo "Installing Marzban version: ${marzban_version:-"not specified"}"
     echo "Using development branch: $USE_DEV_BRANCH"
 
@@ -436,6 +242,147 @@ EOL
     colorized_echo green "Marzban's files downloaded successfully from branch $branch"
 }
 
+
+
+uninstall_marzban_script() {
+    if [ -f "/usr/local/bin/marzban" ]; then
+        colorized_echo yellow "Removing marzban script"
+        rm "/usr/local/bin/marzban"
+    fi
+}
+
+uninstall_marzban() {
+    if [ -d "$APP_DIR" ]; then
+        colorized_echo yellow "Removing directory: $APP_DIR"
+        rm -r "$APP_DIR"
+    fi
+}
+
+uninstall_marzban_docker_images() {
+    images=$(docker images | grep marzban | awk '{print $3}')
+
+    if [ -n "$images" ]; then
+        colorized_echo yellow "Removing Docker images of Marzban"
+        for image in $images; do
+            if docker rmi "$image" >/dev/null 2>&1; then
+                colorized_echo yellow "Image $image removed"
+            fi
+        done
+    fi
+}
+
+uninstall_marzban_data_files() {
+    if [ -d "$DATA_DIR" ]; then
+        colorized_echo yellow "Removing directory: $DATA_DIR"
+        rm -r "$DATA_DIR"
+    fi
+}
+
+up_marzban() {
+    $COMPOSE -f $COMPOSE_FILE -p "$APP_NAME" up -d --remove-orphans
+}
+
+down_marzban() {
+    $COMPOSE -f $COMPOSE_FILE -p "$APP_NAME" down
+}
+
+show_marzban_logs() {
+    $COMPOSE -f $COMPOSE_FILE -p "$APP_NAME" logs
+}
+
+follow_marzban_logs() {
+    $COMPOSE -f $COMPOSE_FILE -p "$APP_NAME" logs -f
+}
+
+marzban_cli() {
+    $COMPOSE -f $COMPOSE_FILE -p "$APP_NAME" exec -e CLI_PROG_NAME="marzban cli" marzban marzban-cli "$@"
+}
+
+
+update_marzban_script() {
+    FETCH_REPO="Gozargah/Marzban-scripts"
+    SCRIPT_URL="https://github.com/$FETCH_REPO/raw/master/marzban.sh"
+    colorized_echo blue "Updating marzban script"
+    curl -sSL $SCRIPT_URL | install -m 755 /dev/stdin /usr/local/bin/marzban
+    colorized_echo green "marzban script updated successfully"
+}
+
+update_marzban() {
+    $COMPOSE -f $COMPOSE_FILE -p "$APP_NAME" pull
+}
+
+is_marzban_installed() {
+    if [ -d $APP_DIR ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+is_marzban_up() {
+    if [ -z "$($COMPOSE -f $COMPOSE_FILE ps -q -a)" ]; then
+        return 1
+    else
+        return 0
+    fi
+}
+install_command() {
+    check_running_as_root
+    # Check if marzban is already installed
+    if is_marzban_installed; then
+        colorized_echo red "Marzban is already installed at $APP_DIR"
+        read -p "Do you want to override the previous installation? (y/n) "
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            colorized_echo red "Aborted installation"
+            exit 1
+        fi
+    fi
+    detect_os
+    if ! command -v jq >/dev/null 2>&1; then
+        install_package jq
+    fi
+    if ! command -v curl >/dev/null 2>&1; then
+        install_package curl
+    fi
+    if ! command -v docker >/dev/null 2>&1; then
+        install_docker
+    fi
+    detect_compose
+    install_marzban_script
+    # Function to check if a version exists in the GitHub releases
+    check_version_exists() {
+        local version=$1
+        repo_url="https://api.github.com/repos/Gozargah/Marzban/releases"
+        if [ "$version" == "latest" ]; then
+            return 0
+        fi
+
+        # Fetch the release data from GitHub API
+        response=$(curl -s "$repo_url")
+
+        # Check if the response contains the version tag
+        if echo "$response" | jq -e ".[] | select(.tag_name == \"${version}\")" > /dev/null; then
+            return 0
+        else
+            return 1
+        fi
+    }
+    # Check if the version is valid and exists
+    if [[ "$1" == "latest" || "$1" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        if check_version_exists "$1"; then
+                install_marzban "$1"
+            echo "Installing $1 version"
+        else
+            echo "Version $1 does not exist. Please enter a valid version (e.g. v0.5.2)"
+            exit 1
+        fi
+    else
+        echo "Invalid version format. Please enter a valid version (e.g. v0.5.2)"
+        exit 1
+    fi
+    up_marzban
+    follow_marzban_logs
+}
 
 
 uninstall_command() {
