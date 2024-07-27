@@ -323,63 +323,119 @@ is_marzban_up() {
         return 0
     fi
 }
-install_command() {
-    check_running_as_root
-    # Check if marzban is already installed
-    if is_marzban_installed; then
-        colorized_echo red "Marzban is already installed at $APP_DIR"
-        read -p "Do you want to override the previous installation? (y/n) "
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            colorized_echo red "Aborted installation"
-            exit 1
-        fi
-    fi
-    detect_os
-    if ! command -v jq >/dev/null 2>&1; then
-        install_package jq
-    fi
-    if ! command -v curl >/dev/null 2>&1; then
-        install_package curl
-    fi
-    if ! command -v docker >/dev/null 2>&1; then
-        install_docker
-    fi
-    detect_compose
-    install_marzban_script
-    # Function to check if a version exists in the GitHub releases
-    check_version_exists() {
-        local version=$1
-        repo_url="https://api.github.com/repos/Gozargah/Marzban/releases"
-        if [ "$version" == "latest" ]; then
-            return 0
-        fi
+install_marzban() {
+    local marzban_version=$1
+    echo "Installing Marzban version: ${marzban_version:-"not specified"}"
+    echo "Using development branch: $USE_DEV_BRANCH"
 
-        # Fetch the release data from GitHub API
-        response=$(curl -s "$repo_url")
+    # Determine the branch to use
+    local branch="master"
+    if [ "$USE_DEV_BRANCH" = true ]; then
+        branch="dev"
+    fi
 
-        # Check if the response contains the version tag
-        if echo "$response" | jq -e ".[] | select(.tag_name == \"${version}\")" > /dev/null; then
-            return 0
-        else
-            return 1
-        fi
-    }
-    # Check if the version is valid and exists
-    if [[ "$1" == "latest" || "$1" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        if check_version_exists "$1"; then
-                install_marzban "$1"
-            echo "Installing $1 version"
-        else
-            echo "Version $1 does not exist. Please enter a valid version (e.g. v0.5.2)"
-            exit 1
-        fi
+    echo "Fetching files from branch: $branch"
+    FILES_URL_PREFIX="https://raw.githubusercontent.com/Gozargah/Marzban/$branch"
+
+    mkdir -p "$DATA_DIR"
+    mkdir -p "$APP_DIR"
+
+    colorized_echo blue "Fetching compose file from branch $branch"
+    curl -sL "$FILES_URL_PREFIX/docker-compose.yml" -o "$APP_DIR/docker-compose.yml"
+    docker_file_path="$APP_DIR/docker-compose.yml"
+
+    echo "docker-compose.yml before modification:"
+    cat "$docker_file_path"
+
+    # install requested version
+    if [ -z "$marzban_version" ]; then
+        echo "Skipping version setting for development branch"
+    elif [ "$marzban_version" == "latest" ]; then
+        echo "Setting Marzban version to latest in docker-compose.yml"
+        sed -i "s|image: gozargah/marzban:.*|image: gozargah/marzban:latest|g" "$docker_file_path"
     else
-        echo "Invalid version format. Please enter a valid version (e.g. v0.5.2)"
-        exit 1
+        echo "Setting Marzban version to $marzban_version in docker-compose.yml"
+        sed -i "s|image: gozargah/marzban:.*|image: gozargah/marzban:${marzban_version}|g" "$docker_file_path"
     fi
-    up_marzban
-    follow_marzban_logs
+
+    echo "docker-compose.yml after modification:"
+    cat "$docker_file_path"
+
+    if [ "$USE_MARIADB" = true ]; then
+        echo "Adding MariaDB configuration to docker-compose.yml"
+        sed -i '/- \/var\/lib\/marzban:\/var\/lib\/marzban/a \ \ \ \ depends_on:\n \ \ \ \ \ \ - mysql' "$docker_file_path"
+        cat <<EOL >> "$docker_file_path"
+  mysql:
+    image: mariadb:lts
+    environment:
+      MYSQL_ROOT_PASSWORD: my-root-password
+      MYSQL_ROOT_HOST: '%'
+      MYSQL_DATABASE: marzban
+      MYSQL_USER: marzban
+      MYSQL_PASSWORD: password
+    network_mode: host
+    command:
+      - --bind-address=127.0.0.1
+      - --character_set_server=utf8mb4
+      - --collation_server=utf8mb4_unicode_ci
+      - --host-cache-size=0
+      - --innodb-open-files=1024
+      - --innodb-buffer-pool-size=268435456
+    volumes:
+      - /var/lib/marzban/mysql:/var/lib/mysql
+EOL
+    fi
+
+    if [ "$USE_MYSQL" = true ]; then
+        echo "Adding MySQL configuration to docker-compose.yml"
+        sed -i '/- \/var\/lib\/marzban:\/var\/lib\/marzban/a \ \ \ \ depends_on:\n \ \ \ \ \ \ - mysql' "$docker_file_path"
+        cat <<EOL >> "$docker_file_path"
+  mysql:
+    image: mysql:8.3
+    environment:
+      MYSQL_ROOT_PASSWORD: my-root-password
+      MYSQL_ROOT_HOST: '%'
+      MYSQL_DATABASE: marzban
+      MYSQL_USER: marzban
+      MYSQL_PASSWORD: password
+    network_mode: host
+    command:
+      - --mysqlx=OFF
+      - --bind-address=127.0.0.1
+      - --character_set_server=utf8mb4
+      - --collation_server=utf8mb4_unicode_ci
+      - --disable-log-bin
+      - --host-cache-size=0
+      - --innodb-open-files=1024
+      - --innodb-buffer-pool-size=268435456
+    volumes:
+      - /var/lib/marzban/mysql:/var/lib/mysql
+EOL
+    fi
+
+    colorized_echo green "File saved in $APP_DIR/docker-compose.yml"
+
+    colorized_echo blue "Fetching .env file from branch $branch"
+    curl -sL "$FILES_URL_PREFIX/.env.example" -o "$APP_DIR/.env"
+    sed -i 's/^# \(XRAY_JSON = .*\)$/\1/' "$APP_DIR/.env"
+    sed -i 's/^# \(SQLALCHEMY_DATABASE_URL = .*\)$/\1/' "$APP_DIR/.env"
+
+    if [ "$USE_MARIADB" = true ] || [ "$USE_MYSQL" = true ]; then
+        sed -i 's~\(SQLALCHEMY_DATABASE_URL = \).*~\1"mysql+pymysql://marzban:password@127.0.0.1:3306/marzban"~' "$APP_DIR/.env"
+    else
+        sed -i 's~\(SQLALCHEMY_DATABASE_URL = \).*~\1"sqlite:////var/lib/marzban/db.sqlite3"~' "$APP_DIR/.env"
+    fi
+
+    sed -i 's~\(XRAY_JSON = \).*~\1"/var/lib/marzban/xray_config.json"~' "$APP_DIR/.env"
+    colorized_echo green "File saved in $APP_DIR/.env"
+
+    colorized_echo blue "Fetching xray config file from branch $branch"
+    curl -sL "$FILES_URL_PREFIX/xray_config.json" -o "$DATA_DIR/xray_config.json"
+    colorized_echo green "File saved in $DATA_DIR/xray_config.json"
+
+    colorized_echo green "Marzban's files downloaded successfully from branch $branch"
 }
+
 
 
 uninstall_command() {
@@ -817,7 +873,7 @@ case "$1" in
     shift; logs_command "$@";;
     cli)
     shift; cli_command "$@";;
-     install)
+    install)
         shift
         if [[ "$1" == "--mariadb" ]]; then
             USE_MARIADB=true
@@ -831,7 +887,13 @@ case "$1" in
             USE_DEV_BRANCH=true
             shift
         fi
-        install_command "${1:-latest}"
+
+        # Determine the version to install
+        if [ "$USE_DEV_BRANCH" = true ] && [ -z "$1" ]; then
+            install_command ""
+        else
+            install_command "${1:-latest}"
+        fi
     ;;
     update)
     shift; update_command "$@";;
