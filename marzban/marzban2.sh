@@ -349,6 +349,7 @@ install_command() {
     fi
     detect_compose
     install_marzban_script
+    
     # Function to check if a version exists in the GitHub releases
     check_version_exists() {
         local version=$1
@@ -367,10 +368,13 @@ install_command() {
             return 1
         fi
     }
-    # Check if the version is valid and exists
-    if [[ "$1" == "latest" || "$1" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+
+    # Check if the version is valid and exists, unless using dev branch without version
+    if [ "$USE_DEV_BRANCH" = true ] && [ -z "$1" ]; then
+        install_marzban ""
+    elif [[ "$1" == "latest" || "$1" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         if check_version_exists "$1"; then
-                install_marzban "$1"
+            install_marzban "$1"
             echo "Installing $1 version"
         else
             echo "Version $1 does not exist. Please enter a valid version (e.g. v0.5.2)"
@@ -380,9 +384,11 @@ install_command() {
         echo "Invalid version format. Please enter a valid version (e.g. v0.5.2)"
         exit 1
     fi
+
     up_marzban
     follow_marzban_logs
 }
+
 
 
 uninstall_command() {
