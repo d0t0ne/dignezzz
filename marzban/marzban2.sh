@@ -369,20 +369,22 @@ install_command() {
         fi
     }
 
-    # Check if the version is valid and exists, unless using dev branch without version
-    if [ "$USE_DEV_BRANCH" = true ] && [ -z "$1" ]; then
+    if [ "$USE_DEV_BRANCH" = true ]; then
         install_marzban ""
-    elif [[ "$1" == "latest" || "$1" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        if check_version_exists "$1"; then
-            install_marzban "$1"
-            echo "Installing $1 version"
+    else
+        # Check if the version is valid and exists
+        if [[ "$1" == "latest" || "$1" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            if check_version_exists "$1"; then
+                install_marzban "$1"
+                echo "Installing $1 version"
+            else
+                echo "Version $1 does not exist. Please enter a valid version (e.g. v0.5.2)"
+                exit 1
+            fi
         else
-            echo "Version $1 does not exist. Please enter a valid version (e.g. v0.5.2)"
+            echo "Invalid version format. Please enter a valid version (e.g. v0.5.2)"
             exit 1
         fi
-    else
-        echo "Invalid version format. Please enter a valid version (e.g. v0.5.2)"
-        exit 1
     fi
 
     up_marzban
@@ -826,7 +828,7 @@ case "$1" in
     shift; logs_command "$@";;
     cli)
     shift; cli_command "$@";;
-    install)
+   install)
         shift
         if [[ "$1" == "--mariadb" ]]; then
             USE_MARIADB=true
@@ -842,7 +844,7 @@ case "$1" in
         fi
 
         # Determine the version to install
-        if [ "$USE_DEV_BRANCH" = true ] && [ -z "$1" ]; then
+        if [ "$USE_DEV_BRANCH" = true ]; then
             install_command ""
         else
             install_command "${1:-latest}"
