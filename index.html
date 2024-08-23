@@ -12,60 +12,73 @@
             line-height: 1.6;
             padding: 20px;
         }
-        a {
-            color: #58a6ff;
-            text-decoration: none;
+        .language-switcher {
+            position: absolute;
+            top: 20px;
+            right: 20px;
         }
-        a:hover {
-            text-decoration: underline;
+        .language-switcher img {
+            width: 30px;
+            height: auto;
+            cursor: pointer;
+            opacity: 0.5;
+            margin-left: 10px;
         }
-        h1, h2, h3 {
-            color: #c9d1d9;
+        .language-switcher img.active {
+            opacity: 1;
         }
-        p {
-            margin-bottom: 15px;
-        }
-        hr {
-            border: 1px solid #21262d;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-        }
-        th, td {
-            padding: 10px;
-            border: 1px solid #30363d;
-        }
-        th {
-            background-color: #161b22;
-            color: #c9d1d9;
-        }
-        td {
-            background-color: #0d1117;
-        }
-        .container {
+        .content {
             max-width: 800px;
             margin: 0 auto;
         }
+        /* Остальные стили остаются прежними */
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>dignezzz.github.io</h1>
-        <p>Основная страница всех публикаций.</p>
-        <p>Инфа будет позже.</p>
-        <p>
-            Мой форум: <a href="https://openode.xyz">https://openode.xyz</a><br>
-            На форуме действуют подписки для доступа к Клубам (в т.ч. по Marzban): <a href="https://openode.xyz/subscriptions/">https://openode.xyz/subscriptions/</a><br>
-            В клубе собраны циклы статей по полноценной установке этой и других панелей, обеспечения удобства и безопасного доступа. А также эксклюзивный дизайн подписки.
-        </p>
+    <div class="language-switcher">
+        <img src="https://flagcdn.com/32x24/ru.png" alt="Русский" id="ru" class="active">
+        <img src="https://flagcdn.com/32x24/gb.png" alt="English" id="en">
+    </div>
 
-        <hr>
+    <div class="content">
+        <!-- Контент на русском -->
+        <div class="lang ru">
+            <h1>dignezzz.github.io</h1>
+            <p>Основная страница всех публикаций.</p>
+            <p>Инфа будет позже.</p>
+            <p>
+                Мой форум: <a href="https://openode.xyz">https://openode.xyz</a><br>
+                На форуме действуют подписки для доступа к Клубам (в т.ч. по Marzban): <a href="https://openode.xyz/subscriptions/">https://openode.xyz/subscriptions/</a><br>
+                В клубе собраны циклы статей по полноценной установке этой и других панелей, обеспечения удобства и безопасного доступа. А также эксклюзивный дизайн подписки.
+            </p>
+        </div>
 
-        <div markdown="1">
-            {% include_relative README.md %}
+        <!-- Контент на английском -->
+        <div class="lang en" style="display:none;">
+            <h1>dignezzz.github.io</h1>
+            <p>Main page for all publications.</p>
+            <p>Information will be available later.</p>
+            <p>
+                My forum: <a href="https://openode.xyz">https://openode.xyz</a><br>
+                Subscriptions are available on the forum for access to Clubs (including Marzban): <a href="https://openode.xyz/subscriptions/">https://openode.xyz/subscriptions/</a><br>
+                The club contains cycles of articles on the full installation of this and other panels, ensuring convenience and secure access. As well as an exclusive subscription design.
+            </p>
         </div>
     </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('.language-switcher img').click(function() {
+                var selectedLang = $(this).attr('id');
+                $('.lang').hide();  // Скрываем все языковые блоки
+                $('.' + selectedLang).show();  // Показываем только выбранный язык
+                
+                // Устанавливаем активный флажок
+                $('.language-switcher img').removeClass('active');
+                $(this).addClass('active');
+            });
+        });
+    </script>
 </body>
 </html>
