@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>dignezzz.github.io</title>
+    <style>
+        body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+            line-height: 1.6;
+            padding: 20px;
+        }
+        a {
+            color: #58a6ff;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        h1, h2, h3 {
+            color: #c9d1d9;
+        }
+        p {
+            margin-bottom: 15px;
+        }
+        hr {
+            border: 1px solid #21262d;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            padding: 10px;
+            border: 1px solid #30363d;
+        }
+        th {
+            background-color: #161b22;
+            color: #c9d1d9;
+        }
+        td {
+            background-color: #0d1117;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>dignezzz.github.io</h1>
+        <p>Основная страница всех публикаций.</p>
+        <p>Инфа будет позже.</p>
+        <p>
+            Мой форум: <a href="https://openode.xyz">https://openode.xyz</a><br>
+            На форуме действуют подписки для доступа к Клубам (в т.ч. по Marzban): <a href="https://openode.xyz/subscriptions/">https://openode.xyz/subscriptions/</a><br>
+            В клубе собраны циклы статей по полноценной установке этой и других панелей, обеспечения удобства и безопасного доступа. А также эксклюзивный дизайн подписки.
+        </p>
+
+        <hr>
+
+        <div markdown="1">
+            {% include_relative README.md %}
+        </div>
+    </div>
+</body>
+</html>
