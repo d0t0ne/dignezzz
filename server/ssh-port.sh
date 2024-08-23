@@ -1,21 +1,21 @@
 #!/bin/bash
 
-# Проверка прав администратора
+# Check if the script is run as root
 check_root() {
     if [ "$EUID" -ne 0 ]; then 
-        echo "Пожалуйста, запустите скрипт с правами суперпользователя (sudo)."
+        echo -e "\e[31mPlease run the script as root (sudo).\e[0m"
         exit 1
     fi
 }
 
-# Определение ОС и версии
+# Detect OS and version
 detect_os() {
     os_name=$(lsb_release -is 2>/dev/null || grep '^ID=' /etc/os-release | cut -d'=' -f2 | tr -d '"')
     os_version=$(lsb_release -rs 2>/dev/null || grep '^VERSION_ID=' /etc/os-release | cut -d'=' -f2 | tr -d '"')
-    echo "Определенная система: $os_name $os_version"
+    echo -e "\e[34mDetected system: $os_name $os_version\e[0m"
 }
 
-# Получение текущего порта
+# Get the current SSH port from a config file
 get_current_port() {
     local config_file=$1
     if [ -f "$config_file" ]; then
@@ -25,17 +25,19 @@ get_current_port() {
     fi
 }
 
-# Смена порта в конфигурационном файле
+# Change the port in the config file
 change_port_in_config() {
     local config_file=$1
     local port=$2
     if [ -f "$config_file" ]; then
         sed -i "s/^#Port 22/Port $port/" "$config_file"
         sed -i "s/^Port [0-9]\+/Port $port/" "$config_file"
+        echo -e "\e[32mPort was changed in the file: $config_file\e[0m"
+        echo -e "\e[32mNew port: $port\e[0m"
     fi
 }
 
-# Перезагрузка SSH службы
+# Reload the SSH service
 reload_ssh_service() {
     if command -v systemctl > /dev/null; then
         systemctl daemon-reload
@@ -45,21 +47,21 @@ reload_ssh_service() {
     fi
 }
 
-# Проверка на занятость порта
+# Check if the port is available
 check_port_availability() {
     local port=$1
     if ss -tuln | grep -q ":$port "; then
-        echo "Ошибка: порт $port уже занят другим процессом."
+        echo -e "\e[31mError: Port $port is already in use by another process.\e[0m"
         exit 1
     fi
 }
 
-# Запрос нового порта у пользователя
+# Prompt for a new port from the user
 prompt_for_port() {
-    read -p "Введите новый порт для SSH (1-65535): " new_port
+    read -p "Enter a new port for SSH (1-65535): " new_port
 
     if ! [[ "$new_port" =~ ^[0-9]+$ ]] || [ "$new_port" -lt 1 ] || [ "$new_port" -gt 65535 ]; then
-        echo "Ошибка: порт должен быть числом в диапазоне от 1 до 65535."
+        echo -e "\e[31mError: Port must be a number between 1 and 65535.\e[0m"
         exit 1
     fi
 
@@ -67,10 +69,10 @@ prompt_for_port() {
     echo "$new_port"
 }
 
-# Смена порта SSH для Ubuntu 24.04
+# Change the SSH port for Ubuntu 24.04
 change_port_ubuntu_2404() {
     local current_port=$(get_current_port "/lib/systemd/system/ssh.socket")
-    echo "Текущий порт SSH: $current_port"
+    echo -e "\e[33mCurrent SSH port: $current_port\e[0m"
     
     local new_port=$(prompt_for_port)
     
@@ -78,23 +80,23 @@ change_port_ubuntu_2404() {
     change_port_in_config "/etc/ssh/sshd_config" "$new_port"
     reload_ssh_service
     
-    echo "Порт SSH успешно изменен на $new_port."
+    echo -e "\e[32mSSH port successfully changed to $new_port.\e[0m"
 }
 
-# Смена порта SSH для других версий Ubuntu и других систем
+# Change the SSH port for other systems
 change_port_other_systems() {
     local current_port=$(get_current_port "/etc/ssh/sshd_config")
-    echo "Текущий порт SSH: $current_port"
+    echo -e "\e[33mCurrent SSH port: $current_port\e[0m"
     
     local new_port=$(prompt_for_port)
     
     change_port_in_config "/etc/ssh/sshd_config" "$new_port"
     reload_ssh_service
     
-    echo "Порт SSH успешно изменен на $new_port."
+    echo -e "\e[32mSSH port successfully changed to $new_port.\e[0m"
 }
 
-# Основная функция
+# Main function
 main() {
     check_root
     detect_os
@@ -111,15 +113,16 @@ main() {
             change_port_other_systems
             ;;
         *)
-            echo "ОС не поддерживается этим скриптом."
+            echo -e "\e[31mOperating system not supported by this script.\e[0m"
             exit 1
             ;;
     esac
 
-    # Вывод информации о новом подключении
-    echo "Теперь вы можете подключиться к серверу с помощью команды:"
-    echo "ssh -p $new_port [ваш_пользователь]@[ваш_сервер]"
+    # Display connection info
+    echo -e "\e[34mYou can now connect to the server using the following command:\e[0m"
+    echo -e "\e[32mssh -p $new_port [your_user]@[your_server]\e[0m"
+    echo -e "\e[36mJoin our community: https://openode.xyz\e[0m"
 }
 
-# Запуск основного скрипта
+# Run the main function
 main
