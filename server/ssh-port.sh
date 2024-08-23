@@ -119,10 +119,10 @@ main() {
     esac
 
     # Display connection info
-    get_current_port
+    
     echo -e "\e[34mYou can now connect to the server using the following command:\e[0m"
-    echo -e "\e[32mssh -p $new_port [your_user]@[your_server]\e[0m"
-    echo -e "\e[36mJoin our community: https://openode.xyz\e[0m"
+    echo -e "\e[32mCreated by DigneZzZ\e[0m"
+    echo -e "\e[36mJoin my community: https://openode.xyz\e[0m"
 }
 
 # Run the main function
