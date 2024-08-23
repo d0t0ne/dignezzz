@@ -34,14 +34,17 @@ jobs:
 
       - name: Generate README with script commands
         run: |
-          echo "| Script Name | Command |" > README.md
-          echo "|-------------|---------|" >> README.md
+          echo "# Scripts" > README.md
           for dir in marzban server; do
+            echo "## $dir" >> README.md
+            echo "| Script Name | Command |" >> README.md
+            echo "|-------------|---------|" >> README.md
             for file in $(find $dir -type f -name "*.sh"); do
               script_name=$(basename $file)
               command="\`bash <(wget -qO- https://dignezzz.github.io/$file)\`"
               echo "| $script_name | $command |" >> README.md
             done
+            echo "" >> README.md  # Добавляем пустую строку после каждой таблицы
           done
           
       - name: Commit README changes
