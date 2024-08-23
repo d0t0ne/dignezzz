@@ -1,5 +1,6 @@
 # Scripts
 ## marzban
+
 | Script Name | Command |
 |-------------|---------|
 | backup2e.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/backup2e.sh)` |
@@ -10,6 +11,7 @@
 | ufw_node.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/ufw_node.sh)` |
 
 ## server
+
 | Script Name | Command |
 |-------------|---------|
 | ufw-copy.sh | `bash <(wget -qO- https://dignezzz.github.io/server/ufw-copy.sh)` |
