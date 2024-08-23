@@ -81,6 +81,7 @@ change_port_ubuntu_2404() {
     reload_ssh_service
     
     echo -e "\e[32mSSH port successfully changed to $new_port.\e[0m"
+    check_firewall_rules "$new_port"
 }
 
 # Change the SSH port for other systems
@@ -94,6 +95,30 @@ change_port_other_systems() {
     reload_ssh_service
     
     echo -e "\e[32mSSH port successfully changed to $new_port.\e[0m"
+    check_firewall_rules "$new_port"
+}
+
+# Check and open the new port in ufw or iptables
+check_firewall_rules() {
+    local port=$1
+    if command -v ufw > /dev/null; then
+        if ufw status | grep -q "inactive"; then
+            echo -e "\e[33mUFW is inactive, skipping UFW rules.\e[0m"
+        else
+            ufw allow "$port"/tcp
+            ufw reload
+            echo -e "\e[32mPort $port has been allowed in UFW.\e[0m"
+        fi
+    elif command -v iptables > /dev/null; then
+        if ! iptables -C INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null; then
+            iptables -I INPUT -p tcp --dport "$port" -j ACCEPT
+            echo -e "\e[32mPort $port has been allowed in iptables.\e[0m"
+        else
+            echo -e "\e[33mPort $port is already allowed in iptables.\e[0m"
+        fi
+    else
+        echo -e "\e[31mNo firewall (ufw or iptables) detected. Please ensure port $port is open manually.\e[0m"
+    fi
 }
 
 # Main function
@@ -119,7 +144,6 @@ main() {
     esac
 
     # Display connection info
-    
     echo -e "\e[34mYou can now connect to the server using the following command:\e[0m"
     echo -e "\e[32mCreated by DigneZzZ\e[0m"
     echo -e "\e[36mJoin my community: https://openode.xyz\e[0m"
