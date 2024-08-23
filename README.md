@@ -1,9 +1,12 @@
-# dignezzz.github.io
-
-## Основная страница всех публкаций. 
-### Инфа будет позже.
-<p>
-  Мой форум: https://openode.xyz
-  <br />На форуме действуют подписки для доступа к Клубам (в т.ч. по Marzban): https://openode.xyz/subscriptions/
-  <br />В клубе собраны циклы статей по полноценной установке этой и других панелей, обеспечения удобства и безопасного доступа. А также эксклюзивный дизайн подписки.
-</p>
+| Script Name | Command |
+|-------------|---------|
+| backup2e.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/backup2e.sh)` |
+| core_change.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/core_change.sh)` |
+| ufw_main.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/ufw_main.sh)` |
+| backup2.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/backup2.sh)` |
+| backup.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/backup.sh)` |
+| ufw_node.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/ufw_node.sh)` |
+| ufw-copy.sh | `bash <(wget -qO- https://dignezzz.github.io/server/ufw-copy.sh)` |
+| ssh-port.sh | `bash <(wget -qO- https://dignezzz.github.io/server/ssh-port.sh)` |
+| unlimit_server.sh | `bash <(wget -qO- https://dignezzz.github.io/server/unlimit_server.sh)` |
+| sysctl_opt.sh | `bash <(wget -qO- https://dignezzz.github.io/server/sysctl_opt.sh)` |
