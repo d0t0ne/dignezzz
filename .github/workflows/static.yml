@@ -11,7 +11,7 @@ on:
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
-  contents: read
+  contents: write  # Изменено на 'write' для возможности коммита изменений
   pages: write
   id-token: write
 
@@ -31,13 +31,36 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Generate README with script commands
+        run: |
+          echo "| Script Name | Command |" > README.md
+          echo "|-------------|---------|" >> README.md
+          for dir in marzban server; do
+            for file in $(find $dir -type f -name "*.sh"); do
+              script_name=$(basename $file)
+              command="\`bash <(wget -qO- https://dignezzz.github.io/$file)\`"
+              echo "| $script_name | $command |" >> README.md
+            done
+          done
+          
+      - name: Commit README changes
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "dignezzz@gmail.com"
+          git add README.md
+          git commit -m "Auto-generate README with script links"
+          git push
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           # Upload entire repository
           path: '.'
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
