@@ -144,7 +144,7 @@ main() {
     esac
 
     # Display connection info
-    echo -e "\e[34mYou can now connect to the server using the following command:\e[0m"
+    echo -e "\e[34m----------------------------------------------------\e[0m"
     echo -e "\e[32mCreated by DigneZzZ\e[0m"
     echo -e "\e[36mJoin my community: https://openode.xyz\e[0m"
 }
