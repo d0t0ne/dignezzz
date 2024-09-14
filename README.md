@@ -3,6 +3,7 @@
 
 | Script Name | Command |
 |-------------|---------|
+| move_to_sql.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/move_to_sql.sh)` |
 | core_change.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/core_change.sh)` |
 | backup2.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/backup2.sh)` |
 | backup2e.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/backup2e.sh)` |
