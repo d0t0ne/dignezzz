@@ -12,3 +12,7 @@ bash <(wget -qO- https://dignezzz.github.io/marzban/ufw_node.sh)
 ```bash
 bash <(wget -qO- https://dignezzz.github.io/marzban/core_change.sh)
 ```
+### Переезд на MySQL
+```bash
+bash <(wget -qO- https://dignezzz.github.io/marzban/move_to_sql.sh)
+```
