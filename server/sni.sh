@@ -26,15 +26,23 @@ function check_and_install_command() {
 # Проверка поддержки TLS 1.3 и вывод используемой версии TLS
 function check_tls() {
   echo -e "${CYAN}Проверка поддержки TLS для $DOMAIN...${RESET}"
-  tls_version=$(echo | timeout 5 openssl s_client -connect $DOMAIN:443 -tls1_3 2>/dev/null | grep "TLSv1.3")
-  if [[ -n $tls_version ]]; then
+  tls_version=$(echo | timeout 5 openssl s_client -connect $DOMAIN:443 -tls1_3 2>&1)
+  if echo "$tls_version" | grep -q "TLSv1.3"; then
     echo -e "${GREEN}TLS 1.3 поддерживается${RESET}"
     TLS_RESULT=true
   else
-    tls_version=$(echo | timeout 5 openssl s_client -connect $DOMAIN:443 2>/dev/null | grep "Protocol" | awk '{print $2}')
-    echo -e "${YELLOW}TLS 1.3 не поддерживается. Используемая версия: ${tls_version}${RESET}"
+    # Попытка соединиться без указания версии TLS
+    tls_output=$(echo | timeout 5 openssl s_client -connect $DOMAIN:443 2>&1)
+    protocol_line=$(echo "$tls_output" | grep -E "Protocol *:")
+    if [[ -n $protocol_line ]]; then
+      tls_used=$(echo "$protocol_line" | awk -F ': ' '{print $2}')
+      echo -e "${YELLOW}TLS 1.3 не поддерживается. Используемая версия: ${tls_used}${RESET}"
+    else
+      echo -e "${RED}Не удалось определить используемую версию TLS${RESET}"
+    fi
   fi
 }
+
 
 # Многоуровневая проверка поддержки HTTP/2 и HTTP/3
 function check_http_version() {
