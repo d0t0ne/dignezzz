@@ -221,12 +221,29 @@ function check_cdn() {
   echo -e "${GREEN}CDN не используется${RESET}"
 }
 
-# Итоговая проверка на SNI для Reality
+# Итоговая проверка на SNI для Reality с пояснениями
 function check_sni_for_reality() {
-  if [ "$TLS_RESULT" == "true" ] && [ "$HTTP_RESULT" == "true" ] && [ "$CDN_RESULT" == "false" ]; then
+  local reasons=()
+  
+  if [ "$TLS_RESULT" != "true" ]; then
+    reasons+=("Не поддерживается TLS 1.3")
+  fi
+  
+  if [ "$HTTP_RESULT" != "true" ]; then
+    reasons+=("Не поддерживается HTTP/2 или HTTP/3")
+  fi
+  
+  if [ "$CDN_RESULT" == "true" ]; then
+    reasons+=("Используется CDN")
+  fi
+  
+  if [ ${#reasons[@]} -eq 0 ]; then
     echo -e "${GREEN}Сайт подходит как SNI для Reality${RESET}"
   else
-    echo -e "${RED}Сайт не подходит как SNI для Reality${RESET}"
+    echo -e "${RED}Сайт не подходит как SNI для Reality по следующим причинам:${RESET}"
+    for reason in "${reasons[@]}"; do
+      echo -e "${YELLOW}- $reason${RESET}"
+    done
   fi
 }
 
