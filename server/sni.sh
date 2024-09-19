@@ -52,19 +52,6 @@ function check_http_version() {
     echo -e "${YELLOW}HTTP/2 не поддерживается (через curl)${RESET}"
   fi
 
-  # Проверка HTTP/3 с помощью curl
-  if curl -V | grep -q "with quiche"; then
-    http3_check=$(curl -I -s --max-time 5 --http3 https://$DOMAIN 2>/dev/null | grep -i "^HTTP/3")
-    if [[ -n $http3_check ]]; then
-      echo -e "${GREEN}HTTP/3 поддерживается (через curl)${RESET}"
-      HTTP3_SUPPORTED=true
-    else
-      echo -e "${YELLOW}HTTP/3 не поддерживается (через curl)${RESET}"
-    fi
-  else
-    echo -e "${YELLOW}curl не поддерживает HTTP/3 (отсутствует quiche)${RESET}"
-  fi
-
   # Дополнительные проверки для HTTP/2, если не найдено
   if [ "$HTTP2_SUPPORTED" != "true" ]; then
     # Использование openssl для проверки ALPN протоколов
@@ -99,30 +86,55 @@ function check_http_version() {
         echo -e "${RED}Не удалось установить nghttp для проверки HTTP/2${RESET}"
       fi
     fi
+  fi
 
-    # Использование nmap
+  # Проверка поддержки HTTP/3
+
+  # Метод 1: Использование nmap
+  if command -v nmap &> /dev/null; then
+    nmap_output=$(timeout 10 nmap -p 443 --script http3 -Pn $DOMAIN 2>/dev/null)
+    if echo "$nmap_output" | grep -iq "open" && echo "$nmap_output" | grep -iq "http3"; then
+      echo -e "${GREEN}HTTP/3 поддерживается (через nmap)${RESET}"
+      HTTP3_SUPPORTED=true
+    else
+      echo -e "${YELLOW}HTTP/3 не поддерживается (через nmap)${RESET}"
+    fi
+  else
+    sudo apt-get install -y nmap > /dev/null 2>&1
     if command -v nmap &> /dev/null; then
-      nmap_output=$(timeout 10 nmap --script ssl-enum-alpns -p443 $DOMAIN 2>/dev/null)
-      if echo "$nmap_output" | grep -q "h2"; then
-        echo -e "${GREEN}HTTP/2 поддерживается (через nmap)${RESET}"
-        HTTP2_SUPPORTED=true
+      nmap_output=$(timeout 10 nmap -p 443 --script http3 -Pn $DOMAIN 2>/dev/null)
+      if echo "$nmap_output" | grep -iq "open" && echo "$nmap_output" | grep -iq "http3"; then
+        echo -e "${GREEN}HTTP/3 поддерживается (через nmap)${RESET}"
+        HTTP3_SUPPORTED=true
       else
-        echo -e "${YELLOW}HTTP/2 не поддерживается (через nmap)${RESET}"
+        echo -e "${YELLOW}HTTP/3 не поддерживается (через nmap)${RESET}"
       fi
     else
-      sudo apt-get install -y nmap > /dev/null 2>&1
-      if command -v nmap &> /dev/null; then
-        nmap_output=$(timeout 10 nmap --script ssl-enum-alpns -p443 $DOMAIN 2>/dev/null)
-        if echo "$nmap_output" | grep -q "h2"; then
-          echo -e "${GREEN}HTTP/2 поддерживается (через nmap)${RESET}"
-          HTTP2_SUPPORTED=true
-        else
-          echo -e "${YELLOW}HTTP/2 не поддерживается (через nmap)${RESET}"
-        fi
-      else
-        echo -e "${RED}Не удалось установить nmap для проверки HTTP/2${RESET}"
-      fi
+      echo -e "${RED}Не удалось установить nmap для проверки HTTP/3${RESET}"
     fi
+  fi
+
+  # Метод 2: Использование openssl для проверки ALPN протоколов
+  alpn_protocols=$(echo | timeout 5 openssl s_client -alpn h3 -connect $DOMAIN:443 2>/dev/null | grep "ALPN protocol")
+  if echo "$alpn_protocols" | grep -iq "h3"; then
+    echo -e "${GREEN}HTTP/3 поддерживается (через openssl)${RESET}"
+    HTTP3_SUPPORTED=true
+  else
+    echo -e "${YELLOW}HTTP/3 не поддерживается (через openssl)${RESET}"
+  fi
+
+  # Метод 3: Использование quiccheck
+  if command -v quiccheck &> /dev/null; then
+    quiccheck_output=$(quiccheck https://$DOMAIN 2>/dev/null)
+    if echo "$quiccheck_output" | grep -iq "supported"; then
+      echo -e "${GREEN}HTTP/3 поддерживается (через quiccheck)${RESET}"
+      HTTP3_SUPPORTED=true
+    else
+      echo -e "${YELLOW}HTTP/3 не поддерживается (через quiccheck)${RESET}"
+    fi
+  else
+    # Предложить установить quiccheck
+    echo -e "${YELLOW}Утилита quiccheck не установлена. Вы можете установить её для проверки HTTP/3.${RESET}"
   fi
 
   # Вывод итогов
