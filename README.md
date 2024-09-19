@@ -20,6 +20,7 @@
 | ufw-copy.sh | `bash <(wget -qO- https://dignezzz.github.io/server/ufw-copy.sh)` |
 | sni.sh | `bash <(wget -qO- https://dignezzz.github.io/server/sni.sh)` |
 | swap.sh | `bash <(wget -qO- https://dignezzz.github.io/server/swap.sh)` |
+| dest.sh | `bash <(wget -qO- https://dignezzz.github.io/server/dest.sh)` |
 | ssh-port.sh | `bash <(wget -qO- https://dignezzz.github.io/server/ssh-port.sh)` |
 | unlimit_server.sh | `bash <(wget -qO- https://dignezzz.github.io/server/unlimit_server.sh)` |
 
