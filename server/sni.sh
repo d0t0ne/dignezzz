@@ -10,6 +10,7 @@ RESET="\033[0m"
 TLS_RESULT=false
 HTTP_RESULT=false
 CDN_RESULT=false
+REDIRECT_RESULT=false
 
 # Функция для проверки и установки утилиты
 function check_and_install_command() {
@@ -23,7 +24,7 @@ function check_and_install_command() {
   fi
 }
 
-# Проверка поддержки TLS 1.3 и вывод используемой версии TLS
+# Исправленная функция проверки поддержки TLS 1.3 и вывода используемой версии TLS
 function check_tls() {
   echo -e "${CYAN}Проверка поддержки TLS для $DOMAIN...${RESET}"
   tls_version=$(echo | timeout 5 openssl s_client -connect $DOMAIN:443 -tls1_3 2>&1)
@@ -42,7 +43,6 @@ function check_tls() {
     fi
   fi
 }
-
 
 # Многоуровневая проверка поддержки HTTP/2 и HTTP/3
 function check_http_version() {
@@ -98,51 +98,13 @@ function check_http_version() {
 
   # Проверка поддержки HTTP/3
 
-  # Метод 1: Использование nmap
-  if command -v nmap &> /dev/null; then
-    nmap_output=$(timeout 10 nmap -p 443 --script http3 -Pn $DOMAIN 2>/dev/null)
-    if echo "$nmap_output" | grep -iq "open" && echo "$nmap_output" | grep -iq "http3"; then
-      echo -e "${GREEN}HTTP/3 поддерживается (через nmap)${RESET}"
-      HTTP3_SUPPORTED=true
-    else
-      echo -e "${YELLOW}HTTP/3 не поддерживается (через nmap)${RESET}"
-    fi
-  else
-    sudo apt-get install -y nmap > /dev/null 2>&1
-    if command -v nmap &> /dev/null; then
-      nmap_output=$(timeout 10 nmap -p 443 --script http3 -Pn $DOMAIN 2>/dev/null)
-      if echo "$nmap_output" | grep -iq "open" && echo "$nmap_output" | grep -iq "http3"; then
-        echo -e "${GREEN}HTTP/3 поддерживается (через nmap)${RESET}"
-        HTTP3_SUPPORTED=true
-      else
-        echo -e "${YELLOW}HTTP/3 не поддерживается (через nmap)${RESET}"
-      fi
-    else
-      echo -e "${RED}Не удалось установить nmap для проверки HTTP/3${RESET}"
-    fi
-  fi
-
-  # Метод 2: Использование openssl для проверки ALPN протоколов
+  # Метод 1: Использование openssl для проверки ALPN протоколов
   alpn_protocols=$(echo | timeout 5 openssl s_client -alpn h3 -connect $DOMAIN:443 2>/dev/null | grep "ALPN protocol")
   if echo "$alpn_protocols" | grep -iq "h3"; then
     echo -e "${GREEN}HTTP/3 поддерживается (через openssl)${RESET}"
     HTTP3_SUPPORTED=true
   else
     echo -e "${YELLOW}HTTP/3 не поддерживается (через openssl)${RESET}"
-  fi
-
-  # Метод 3: Использование quiccheck
-  if command -v quiccheck &> /dev/null; then
-    quiccheck_output=$(quiccheck https://$DOMAIN 2>/dev/null)
-    if echo "$quiccheck_output" | grep -iq "supported"; then
-      echo -e "${GREEN}HTTP/3 поддерживается (через quiccheck)${RESET}"
-      HTTP3_SUPPORTED=true
-    else
-      echo -e "${YELLOW}HTTP/3 не поддерживается (через quiccheck)${RESET}"
-    fi
-  else
-    # Предложить установить quiccheck
-    echo -e "${YELLOW}Утилита quiccheck не установлена. Вы можете установить её для проверки HTTP/3.${RESET}"
   fi
 
   # Вывод итогов
@@ -172,8 +134,10 @@ function check_redirect() {
   redirect_check=$(curl -s -o /dev/null -w "%{redirect_url}" --max-time 5 https://$DOMAIN)
   if [ -n "$redirect_check" ]; then
     echo -e "${YELLOW}Переадресация найдена: $redirect_check${RESET}"
+    REDIRECT_RESULT=true
   else
     echo -e "${GREEN}Переадресация отсутствует${RESET}"
+    REDIRECT_RESULT=false
   fi
 }
 
@@ -277,29 +241,57 @@ function check_cdn() {
   echo -e "${GREEN}CDN не используется${RESET}"
 }
 
-# Итоговая проверка на SNI для Reality с пояснениями
+# Итоговая проверка на SNI для Reality с подробным резюме
 function check_sni_for_reality() {
   local reasons=()
-  
-  if [ "$TLS_RESULT" != "true" ]; then
+  local positives=()
+
+  # Проверка TLS 1.3
+  if [ "$TLS_RESULT" == "true" ]; then
+    positives+=("Поддерживается TLS 1.3")
+  else
     reasons+=("Не поддерживается TLS 1.3")
   fi
-  
-  if [ "$HTTP_RESULT" != "true" ]; then
+
+  # Проверка HTTP/2
+  if [ "$HTTP_RESULT" == "true" ]; then
+    positives+=("Поддерживается HTTP/2")
+  else
     reasons+=("Не поддерживается HTTP/2")
   fi
-  
+
+  # Проверка CDN
   if [ "$CDN_RESULT" == "true" ]; then
     reasons+=("Используется CDN")
+  else
+    positives+=("CDN не используется")
   fi
-  
+
+  # Проверка переадресации
+  if [ "$REDIRECT_RESULT" == "false" ]; then
+    positives+=("Переадресация отсутствует")
+  else
+    reasons+=("Найдена переадресация")
+  fi
+
+  echo -e "\n${CYAN}===== Результаты проверки =====${RESET}"
+
   if [ ${#reasons[@]} -eq 0 ]; then
-    echo -e "${GREEN}Сайт подходит как SNI для Reality${RESET}"
+    echo -e "${GREEN}Сайт подходит как SNI для Reality по следующим причинам:${RESET}"
+    for positive in "${positives[@]}"; do
+      echo -e "${GREEN}- $positive${RESET}"
+    done
   else
     echo -e "${RED}Сайт не подходит как SNI для Reality по следующим причинам:${RESET}"
     for reason in "${reasons[@]}"; do
       echo -e "${YELLOW}- $reason${RESET}"
     done
+    if [ ${#positives[@]} -gt 0 ]; then
+      echo -e "\n${GREEN}Положительные моменты:${RESET}"
+      for positive in "${positives[@]}"; do
+        echo -e "${GREEN}- $positive${RESET}"
+      done
+    fi
   fi
 }
 
