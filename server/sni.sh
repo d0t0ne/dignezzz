@@ -15,7 +15,7 @@ CDN_RESULT=false
 function check_and_install_command() {
   if ! command -v $1 &> /dev/null; then
     echo -e "${YELLOW}Утилита $1 не найдена. Устанавливаю...${RESET}"
-    sudo apt-get install -y $1 > /dev/null 2>&1
+    sudo apt-get install -y $1 > /dev/null
     if ! command -v $1 &> /dev/null; then
       echo -e "${RED}Ошибка: не удалось установить $1. Установите её вручную.${RESET}"
       exit 1
