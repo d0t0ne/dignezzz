@@ -299,4 +299,9 @@ check_and_install_command whois
 
 # Выполнение проверок
 check_tls
-check_http_vers
+check_http_version
+check_redirect
+check_cdn
+
+# Итоговая проверка
+check_sni_for_reality
