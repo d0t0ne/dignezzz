@@ -40,74 +40,110 @@ function check_tls() {
 function check_http_version() {
   echo -e "${CYAN}Проверка поддержки HTTP для $DOMAIN...${RESET}"
 
-  # Попытка 1: Проверка HTTP/2 с помощью curl
+  HTTP2_SUPPORTED=false
+  HTTP3_SUPPORTED=false
+
+  # Проверка HTTP/2 с помощью curl
   http2_check=$(curl -I -s --max-time 5 --http2 https://$DOMAIN 2>/dev/null | grep -i "^HTTP/2")
   if [[ -n $http2_check ]]; then
-    echo -e "${GREEN}HTTP/2 поддерживается${RESET}"
-    HTTP_RESULT=true
-    return
+    echo -e "${GREEN}HTTP/2 поддерживается (через curl)${RESET}"
+    HTTP2_SUPPORTED=true
+  else
+    echo -e "${YELLOW}HTTP/2 не поддерживается (через curl)${RESET}"
   fi
 
-  # Попытка 2: Проверка HTTP/3 с помощью curl
+  # Проверка HTTP/3 с помощью curl
   if curl -V | grep -q "with quiche"; then
-    http3_check=$(curl -I --max-time 5 --http3 https://$DOMAIN 2>/dev/null)
-    if echo "$http3_check" | grep -q "HTTP/3"; then
-      echo -e "${GREEN}HTTP/3 поддерживается${RESET}"
-      HTTP_RESULT=true
-      return
-    fi
-  fi
-
-  # Попытка 3: Использование openssl для проверки ALPN протоколов
-  alpn_protocols=$(echo | timeout 5 openssl s_client -alpn h2 -connect $DOMAIN:443 2>/dev/null | grep "ALPN protocol")
-  if echo "$alpn_protocols" | grep -q "h2"; then
-    echo -e "${GREEN}HTTP/2 поддерживается (через openssl)${RESET}"
-    HTTP_RESULT=true
-    return
-  fi
-
-  # Попытка 4: Использование nghttp
-  if command -v nghttp &> /dev/null; then
-    nghttp_output=$(timeout 5 nghttp -nv https://$DOMAIN 2>&1)
-    if echo "$nghttp_output" | grep -q "HTTP/2"; then
-      echo -e "${GREEN}HTTP/2 поддерживается (через nghttp)${RESET}"
-      HTTP_RESULT=true
-      return
+    http3_check=$(curl -I -s --max-time 5 --http3 https://$DOMAIN 2>/dev/null | grep -i "^HTTP/3")
+    if [[ -n $http3_check ]]; then
+      echo -e "${GREEN}HTTP/3 поддерживается (через curl)${RESET}"
+      HTTP3_SUPPORTED=true
+    else
+      echo -e "${YELLOW}HTTP/3 не поддерживается (через curl)${RESET}"
     fi
   else
-    sudo apt-get install -y nghttp2-client > /dev/null 2>&1
+    echo -e "${YELLOW}curl не поддерживает HTTP/3 (отсутствует quiche)${RESET}"
+  fi
+
+  # Дополнительные проверки для HTTP/2, если не найдено
+  if [ "$HTTP2_SUPPORTED" != "true" ]; then
+    # Использование openssl для проверки ALPN протоколов
+    alpn_protocols=$(echo | timeout 5 openssl s_client -alpn h2 -connect $DOMAIN:443 2>/dev/null | grep "ALPN protocol")
+    if echo "$alpn_protocols" | grep -q "h2"; then
+      echo -e "${GREEN}HTTP/2 поддерживается (через openssl)${RESET}"
+      HTTP2_SUPPORTED=true
+    else
+      echo -e "${YELLOW}HTTP/2 не поддерживается (через openssl)${RESET}"
+    fi
+
+    # Использование nghttp
     if command -v nghttp &> /dev/null; then
       nghttp_output=$(timeout 5 nghttp -nv https://$DOMAIN 2>&1)
       if echo "$nghttp_output" | grep -q "HTTP/2"; then
         echo -e "${GREEN}HTTP/2 поддерживается (через nghttp)${RESET}"
-        HTTP_RESULT=true
-        return
+        HTTP2_SUPPORTED=true
+      else
+        echo -e "${YELLOW}HTTP/2 не поддерживается (через nghttp)${RESET}"
+      fi
+    else
+      sudo apt-get install -y nghttp2-client > /dev/null 2>&1
+      if command -v nghttp &> /dev/null; then
+        nghttp_output=$(timeout 5 nghttp -nv https://$DOMAIN 2>&1)
+        if echo "$nghttp_output" | grep -q "HTTP/2"; then
+          echo -e "${GREEN}HTTP/2 поддерживается (через nghttp)${RESET}"
+          HTTP2_SUPPORTED=true
+        else
+          echo -e "${YELLOW}HTTP/2 не поддерживается (через nghttp)${RESET}"
+        fi
+      else
+        echo -e "${RED}Не удалось установить nghttp для проверки HTTP/2${RESET}"
       fi
     fi
-  fi
 
-  # Попытка 5: Использование nmap
-  if command -v nmap &> /dev/null; then
-    nmap_output=$(timeout 10 nmap --script ssl-enum-alpns -p443 $DOMAIN 2>/dev/null)
-    if echo "$nmap_output" | grep -q "h2"; then
-      echo -e "${GREEN}HTTP/2 поддерживается (через nmap)${RESET}"
-      HTTP_RESULT=true
-      return
-    fi
-  else
-    sudo apt-get install -y nmap > /dev/null 2>&1
+    # Использование nmap
     if command -v nmap &> /dev/null; then
       nmap_output=$(timeout 10 nmap --script ssl-enum-alpns -p443 $DOMAIN 2>/dev/null)
       if echo "$nmap_output" | grep -q "h2"; then
         echo -e "${GREEN}HTTP/2 поддерживается (через nmap)${RESET}"
-        HTTP_RESULT=true
-        return
+        HTTP2_SUPPORTED=true
+      else
+        echo -e "${YELLOW}HTTP/2 не поддерживается (через nmap)${RESET}"
+      fi
+    else
+      sudo apt-get install -y nmap > /dev/null 2>&1
+      if command -v nmap &> /dev/null; then
+        nmap_output=$(timeout 10 nmap --script ssl-enum-alpns -p443 $DOMAIN 2>/dev/null)
+        if echo "$nmap_output" | grep -q "h2"; then
+          echo -e "${GREEN}HTTP/2 поддерживается (через nmap)${RESET}"
+          HTTP2_SUPPORTED=true
+        else
+          echo -e "${YELLOW}HTTP/2 не поддерживается (через nmap)${RESET}"
+        fi
+      else
+        echo -e "${RED}Не удалось установить nmap для проверки HTTP/2${RESET}"
       fi
     fi
   fi
 
-  # Если ничего не найдено
-  echo -e "${RED}Не удалось определить поддержку HTTP/2 или HTTP/3${RESET}"
+  # Вывод итогов
+  if [ "$HTTP2_SUPPORTED" == "true" ]; then
+    echo -e "${GREEN}Итог: HTTP/2 поддерживается${RESET}"
+  else
+    echo -e "${RED}Итог: HTTP/2 не поддерживается${RESET}"
+  fi
+
+  if [ "$HTTP3_SUPPORTED" == "true" ]; then
+    echo -e "${GREEN}Итог: HTTP/3 поддерживается${RESET}"
+  else
+    echo -e "${YELLOW}Итог: HTTP/3 не поддерживается или не удалось определить${RESET}"
+  fi
+
+  # Установка HTTP_RESULT (только HTTP/2 влияет на итоговую оценку)
+  if [ "$HTTP2_SUPPORTED" == "true" ]; then
+    HTTP_RESULT=true
+  else
+    HTTP_RESULT=false
+  fi
 }
 
 # Проверка переадресации
@@ -230,7 +266,7 @@ function check_sni_for_reality() {
   fi
   
   if [ "$HTTP_RESULT" != "true" ]; then
-    reasons+=("Не поддерживается HTTP/2 или HTTP/3")
+    reasons+=("Не поддерживается HTTP/2")
   fi
   
   if [ "$CDN_RESULT" == "true" ]; then
@@ -263,9 +299,4 @@ check_and_install_command whois
 
 # Выполнение проверок
 check_tls
-check_http_version
-check_redirect
-check_cdn
-
-# Итоговая проверка
-check_sni_for_reality
+check_http_vers
