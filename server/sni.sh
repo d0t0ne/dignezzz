@@ -1,184 +1,434 @@
 #!/bin/bash
-clear
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+# Цвета для подсветки текста
+GREEN="\033[32m"
+RED="\033[31m"
+CYAN="\033[36m"
+YELLOW="\033[33m"
+RESET="\033[0m"
 
-trap "echo -e '\n${RED}Script interrupted by user.${NC}' && exit 1" SIGINT
+TLS_RESULT=false
+HTTP_RESULT=false
+CDN_RESULT=false
+REDIRECT_RESULT=false
 
-check_dependencies() {
-    dependencies=("wget" "sudo")
-    missing=()
-    for cmd in "${dependencies[@]}"; do
-        if ! command -v "$cmd" &> /dev/null; then
-            missing+=("$cmd")
+# Функция для проверки и установки утилиты
+function check_and_install_command() {
+  if ! command -v $1 &> /dev/null; then
+    echo -e "${YELLOW}Утилита $1 не найдена. Устанавливаю...${RESET}"
+    sudo apt-get install -y $1 > /dev/null
+    if ! command -v $1 &> /dev/null; then
+      echo -e "${RED}Ошибка: не удалось установить $1. Установите её вручную.${RESET}"
+      exit 1
+    fi
+  fi
+}
+
+# функция проверки поддержки TLS 1.3 и вывода используемой версии TLS
+function check_tls() {
+  echo -e "${CYAN}Проверка поддержки TLS для $DOMAIN...${RESET}"
+  tls_version=$(echo | timeout 5 openssl s_client -connect $DOMAIN:443 -tls1_3 2>&1)
+  if echo "$tls_version" | grep -q "TLSv1.3"; then
+    echo -e "${GREEN}TLS 1.3 поддерживается${RESET}"
+    TLS_RESULT=true
+  else
+    
+    tls_output=$(echo | timeout 5 openssl s_client -connect $DOMAIN:443 2>&1)
+    protocol_line=$(echo "$tls_output" | grep -E "Protocol *:")
+    if [[ -n $protocol_line ]]; then
+      tls_used=$(echo "$protocol_line" | awk -F ': ' '{print $2}')
+      echo -e "${YELLOW}TLS 1.3 не поддерживается. Используемая версия: ${tls_used}${RESET}"
+    else
+      echo -e "${RED}Не удалось определить используемую версию TLS${RESET}"
+    fi
+  fi
+}
+
+# Многоуровневая проверка поддержки HTTP/2 и HTTP/3
+function check_http_version() {
+  echo -e "${CYAN}Проверка поддержки HTTP для $DOMAIN...${RESET}"
+
+  HTTP2_SUPPORTED=false
+  HTTP3_SUPPORTED=false
+
+  # Проверка H/2 с помощью curl
+  http2_check=$(curl -I -s --max-time 5 --http2 https://$DOMAIN 2>/dev/null | grep -i "^HTTP/2")
+  if [[ -n $http2_check ]]; then
+    echo -e "${GREEN}HTTP/2 поддерживается (через curl)${RESET}"
+    HTTP2_SUPPORTED=true
+  else
+    echo -e "${YELLOW}HTTP/2 не поддерживается (через curl)${RESET}"
+  fi
+
+  # Дополнительные проверки если не найдено
+  if [ "$HTTP2_SUPPORTED" != "true" ]; then
+    # Использование openssl 
+    alpn_protocols=$(echo | timeout 5 openssl s_client -alpn h2 -connect $DOMAIN:443 2>/dev/null | grep "ALPN protocol")
+    if echo "$alpn_protocols" | grep -q "protocols:.*h2"; then
+      echo -e "${GREEN}HTTP/2 поддерживается (через openssl)${RESET}"
+      HTTP2_SUPPORTED=true
+    else
+      echo -e "${YELLOW}HTTP/2 не поддерживается (через openssl)${RESET}"
+    fi
+
+    # Использование nghttp
+    if command -v nghttp &> /dev/null; then
+      nghttp_output=$(timeout 5 nghttp -nv https://$DOMAIN 2>&1)
+      if echo "$nghttp_output" | grep -q "The negotiated protocol: h2"; then
+        echo -e "${GREEN}HTTP/2 поддерживается (через nghttp)${RESET}"
+        HTTP2_SUPPORTED=true
+      else
+        echo -e "${YELLOW}HTTP/2 не поддерживается (через nghttp)${RESET}"
+      fi
+    else
+      sudo apt-get install -y nghttp2-client > /dev/null 2>&1
+      if command -v nghttp &> /dev/null; then
+        nghttp_output=$(timeout 5 nghttp -nv https://$DOMAIN 2>&1)
+        if echo "$nghttp_output" | grep -q "The negotiated protocol: h2"; then
+          echo -e "${GREEN}HTTP/2 поддерживается (через nghttp)${RESET}"
+          HTTP2_SUPPORTED=true
+        else
+          echo -e "${YELLOW}HTTP/2 не поддерживается (через nghttp)${RESET}"
         fi
+      else
+        echo -e "${RED}Не удалось установить nghttp для проверки HTTP/2${RESET}"
+      fi
+    fi
+  fi
+
+  # Проверка поддержки HTTP/3
+
+  # Использование openssl для проверки ALPN протоколов
+  alpn_protocols=$(echo | timeout 5 openssl s_client -alpn h3 -connect $DOMAIN:443 2>/dev/null | grep "ALPN protocol")
+  if echo "$alpn_protocols" | grep -iq "protocols:.*h3"; then
+    echo -e "${GREEN}HTTP/3 поддерживается (через openssl)${RESET}"
+    HTTP3_SUPPORTED=true
+  else
+    echo -e "${YELLOW}HTTP/3 не поддерживается (через openssl)${RESET}"
+  fi
+
+  # Вывод итогов
+  if [ "$HTTP2_SUPPORTED" == "true" ]; then
+    echo -e "${GREEN}Итог: HTTP/2 поддерживается${RESET}"
+  else
+    echo -e "${RED}Итог: HTTP/2 не поддерживается${RESET}"
+  fi
+
+  if [ "$HTTP3_SUPPORTED" == "true" ]; then
+    echo -e "${GREEN}Итог: HTTP/3 поддерживается${RESET}"
+  else
+    echo -e "${YELLOW}Итог: HTTP/3 не поддерживается или не удалось определить${RESET}"
+  fi
+
+  # Установка HTTP_RESULT (только HTTP/2 влияет на итоговую оценку)
+  if [ "$HTTP2_SUPPORTED" == "true" ]; then
+    HTTP_RESULT=true
+  else
+    HTTP_RESULT=false
+  fi
+}
+
+
+# Проверка переадресации
+function check_redirect() {
+  echo -e "${CYAN}Проверка наличия переадресаций для $DOMAIN...${RESET}"
+  redirect_check=$(curl -s -o /dev/null -w "%{redirect_url}" --max-time 5 https://$DOMAIN)
+  if [ -n "$redirect_check" ]; then
+    echo -e "${YELLOW}Переадресация найдена: $redirect_check${RESET}"
+    REDIRECT_RESULT=true
+  else
+    echo -e "${GREEN}Переадресация отсутствует${RESET}"
+    REDIRECT_RESULT=false
+  fi
+}
+# Функция для анализа HTTP-заголовков
+function check_cdn_headers() {
+  echo -e "${CYAN}Анализ HTTP-заголовков для определения CDN...${RESET}"
+  headers=$(curl -s -I --max-time 5 https://$DOMAIN)
+
+  if echo "$headers" | grep -iq "cloudflare"; then
+    echo -e "${YELLOW}Используется CDN: Cloudflare (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "akamai"; then
+    echo -e "${YELLOW}Используется CDN: Akamai (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "fastly"; then
+    echo -e "${YELLOW}Используется CDN: Fastly (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "incapsula"; then
+    echo -e "${YELLOW}Используется CDN: Imperva Incapsula (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "sucuri"; then
+    echo -e "${YELLOW}Используется CDN: Sucuri (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "stackpath"; then
+    echo -e "${YELLOW}Используется CDN: StackPath (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "cdn77"; then
+    echo -e "${YELLOW}Используется CDN: CDN77 (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "edgecast"; then
+    echo -e "${YELLOW}Используется CDN: Verizon Edgecast (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "keycdn"; then
+    echo -e "${YELLOW}Используется CDN: KeyCDN (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "azurecdn"; then
+    echo -e "${YELLOW}Используется CDN: Microsoft Azure CDN (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "cdn"; then
+    echo -e "${YELLOW}Обнаружены признаки использования CDN (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  else
+    echo -e "${GREEN}По заголовкам CDN не обнаружен${RESET}"
+  fi
+}
+
+# Функция для проверки ASN
+function check_cdn_asn() {
+  echo -e "${CYAN}Проверка ASN для определения CDN...${RESET}"
+  ip=$(dig +short $DOMAIN | head -n1)
+  if [ -z "$ip" ]; then
+    echo -e "${RED}Не удалось получить IP-адрес домена${RESET}"
+    return
+  fi
+  asn_info=$(whois -h whois.cymru.com " -v $ip" 2>/dev/null | tail -n1)
+  asn=$(echo $asn_info | awk '{print $1}')
+  owner=$(echo $asn_info | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
+
+  if echo "$owner" | grep -iq "Cloudflare"; then
+    echo -e "${YELLOW}Используется CDN: Cloudflare (по ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "Akamai"; then
+    echo -e "${YELLOW}Используется CDN: Akamai (по ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "Fastly"; then
+    echo -e "${YELLOW}Используется CDN: Fastly (по ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "Microsoft"; then
+    echo -e "${YELLOW}Используется CDN: Microsoft Azure CDN (по ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "Incapsula"; then
+    echo -e "${YELLOW}Используется CDN: Imperva Incapsula (по ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "Sucuri"; then
+    echo -e "${YELLOW}Используется CDN: Sucuri (по ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "StackPath"; then
+    echo -e "${YELLOW}Используется CDN: StackPath (по ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "CDN77"; then
+    echo -e "${YELLOW}Используется CDN: CDN77 (по ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "Edgecast"; then
+    echo -e "${YELLOW}Используется CDN: Verizon Edgecast (по ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "KeyCDN"; then
+    echo -e "${YELLOW}Используется CDN: KeyCDN (по ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "Alibaba"; then
+    echo -e "${YELLOW}Используется CDN: Alibaba Cloud CDN (по ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "Tencent"; then
+    echo -e "${YELLOW}Используется CDN: Tencent Cloud CDN (по ASN)${RESET}"
+    CDN_RESULT=true
+  else
+    echo -e "${GREEN}По ASN CDN не обнаружен${RESET}"
+  fi
+}
+
+# Функция для использования ipinfo.io
+function check_cdn_ipinfo() {
+  echo -e "${CYAN}Использование ipinfo.io для определения CDN...${RESET}"
+  check_and_install_command jq
+  ip=$(dig +short $DOMAIN | head -n1)
+  if [ -z "$ip" ]; then
+    echo -e "${RED}Не удалось получить IP-адрес домена${RESET}"
+    return
+  fi
+  json=$(curl -s --max-time 5 https://ipinfo.io/$ip/json)
+  org=$(echo $json | jq -r '.org')
+
+  if echo "$org" | grep -iq "Cloudflare"; then
+    echo -e "${YELLOW}Используется CDN: Cloudflare (через ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "Akamai"; then
+    echo -e "${YELLOW}Используется CDN: Akamai (через ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "Fastly"; then
+    echo -e "${YELLOW}Используется CDN: Fastly (через ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "Incapsula"; then
+    echo -e "${YELLOW}Используется CDN: Imperva Incapsula (через ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "Sucuri"; then
+    echo -e "${YELLOW}Используется CDN: Sucuri (через ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  
+  elif echo "$org" | grep -iq "Microsoft"; then
+    echo -e "${YELLOW}Используется CDN: Microsoft Azure CDN (через ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  
+  elif echo "$org" | grep -iq "StackPath"; then
+    echo -e "${YELLOW}Используется CDN: StackPath (через ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "CDN77"; then
+    echo -e "${YELLOW}Используется CDN: CDN77 (через ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "Edgecast"; then
+    echo -e "${YELLOW}Используется CDN: Verizon Edgecast (через ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "KeyCDN"; then
+    echo -e "${YELLOW}Используется CDN: KeyCDN (через ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "Alibaba"; then
+    echo -e "${YELLOW}Используется CDN: Alibaba Cloud CDN (через ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "Tencent"; then
+    echo -e "${YELLOW}Используется CDN: Tencent Cloud CDN (через ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  else
+    echo -e "${GREEN}CDN не обнаружен через ipinfo.io${RESET}"
+  fi
+}
+
+# Функция для анализа SSL-сертификата
+function check_cdn_certificate() {
+  echo -e "${CYAN}Анализ SSL-сертификата для определения CDN...${RESET}"
+  cert_info=$(echo | timeout 5 openssl s_client -connect $DOMAIN:443 2>/dev/null | openssl x509 -noout -issuer -subject)
+  
+  if echo "$cert_info" | grep -iq "Cloudflare"; then
+    echo -e "${YELLOW}Используется CDN: Cloudflare (по SSL-сертификату)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "Microsoft"; then
+    echo -e "${YELLOW}Используется CDN: Microsoft Azure CDN (по SSL-сертификату)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "Akamai"; then
+    echo -e "${YELLOW}Используется CDN: Akamai (по SSL-сертификату)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "Fastly"; then
+    echo -e "${YELLOW}Используется CDN: Fastly (по SSL-сертификату)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "Incapsula"; then
+    echo -e "${YELLOW}Используется CDN: Imperva Incapsula (по SSL-сертификату)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "Sucuri"; then
+    echo -e "${YELLOW}Используется CDN: Sucuri (по SSL-сертификату)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "StackPath"; then
+    echo -e "${YELLOW}Используется CDN: StackPath (по SSL-сертификату)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "CDN77"; then
+    echo -e "${YELLOW}Используется CDN: CDN77 (по SSL-сертификату)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "Edgecast"; then
+    echo -e "${YELLOW}Используется CDN: Verizon Edgecast (по SSL-сертификату)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "KeyCDN"; then
+    echo -e "${YELLOW}Используется CDN: KeyCDN (по SSL-сертификату)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "Alibaba"; then
+    echo -e "${YELLOW}Используется CDN: Alibaba Cloud CDN (по SSL-сертификату)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "Tencent"; then
+    echo -e "${YELLOW}Используется CDN: Tencent Cloud CDN (по SSL-сертификату)${RESET}"
+    CDN_RESULT=true
+  else
+    echo -e "${GREEN}CDN не обнаружен по SSL-сертификату${RESET}"
+  fi
+}
+
+# Объединенная функция проверки CDN
+function check_cdn() {
+  CDN_RESULT=false
+  check_cdn_headers
+  if [ "$CDN_RESULT" == "true" ]; then return; fi
+
+  check_cdn_asn
+  if [ "$CDN_RESULT" == "true" ]; then return; fi
+
+  check_cdn_ipinfo
+  if [ "$CDN_RESULT" == "true" ]; then return; fi
+
+  check_cdn_certificate
+  if [ "$CDN_RESULT" == "true" ]; then return; fi
+
+  echo -e "${GREEN}CDN не используется${RESET}"
+}
+
+# Итоговая проверка на SNI для Reality с подробным резюме
+function check_sni_for_reality() {
+  local reasons=()
+  local positives=()
+
+  # Проверка TLS 1.3
+  if [ "$TLS_RESULT" == "true" ]; then
+    positives+=("Поддерживается TLS 1.3")
+  else
+    reasons+=("Не поддерживается TLS 1.3")
+  fi
+
+  # Проверка HTTP/2
+  if [ "$HTTP_RESULT" == "true" ]; then
+    positives+=("Поддерживается HTTP/2")
+  else
+    reasons+=("Не поддерживается HTTP/2")
+  fi
+
+  # Проверка CDN
+  if [ "$CDN_RESULT" == "true" ]; then
+    reasons+=("Используется CDN")
+  else
+    positives+=("CDN не используется")
+  fi
+
+  # Проверка переадресации
+  if [ "$REDIRECT_RESULT" == "false" ]; then
+    positives+=("Переадресация отсутствует")
+  else
+    reasons+=("Найдена переадресация")
+  fi
+
+  echo -e "\n${CYAN}===== Результаты проверки =====${RESET}"
+
+  if [ ${#reasons[@]} -eq 0 ]; then
+    echo -e "${GREEN}Сайт подходит как SNI для Reality по следующим причинам:${RESET}"
+    for positive in "${positives[@]}"; do
+      echo -e "${GREEN}- $positive${RESET}"
     done
-
-    if [ ${#missing[@]} -ne 0 ]; then
-        echo -e "${RED}The following dependencies are missing:${NC} ${missing[@]}"
-        echo -e "${YELLOW}Please install them manually and re-run the script.${NC}"
-        exit 1
-    fi
-}
-
-check_dependencies
-
-declare -A MESSAGES_EN=(
-    ["select_language"]="Select Language:"
-    ["option1"]="1) English (default)"
-    ["option2"]="2) Русский"
-    ["invalid_option"]="Invalid option. Continuing with English."
-    ["update_python"]="Installing Python 3 and required packages..."
-    ["package_manager_fail"]="Failed to determine package manager. Please install Python 3 manually."
-    ["install_fail"]="Failed to install Python 3 automatically. Please install it manually and try again."
-    ["default_lang"]="Defaulting to English."
-    ["usage"]="Usage: script.py <domain>"
-    ["missing_packages"]="The following Python packages are missing: "
-    ["installing_packages"]="Installing missing Python packages..."
-    ["wget_missing"]="wget is not installed. Please install wget and try again."
-    ["install_pip"]="Installing pip3 using ensurepip..."
-    ["install_pip_fail"]="Failed to install pip3. Plz, install manually, or try to restart this script"
-)
-
-declare -A MESSAGES_RU=(
-    ["select_language"]="Выберите язык:"
-    ["option1"]="1) Английский (по умолчанию)"
-    ["option2"]="2) Русский"
-    ["invalid_option"]="Неверный выбор. Продолжаем на Английском."
-    ["update_python"]="Устанавливаем Python 3 и необходимые пакеты..."
-    ["package_manager_fail"]="Не удалось определить пакетный менеджер. Установите Python 3 вручную."
-    ["install_fail"]="Не удалось установить Python 3 автоматически. Установите его вручную и повторите попытку."
-    ["default_lang"]="По умолчанию выбран Английский."
-    ["usage"]="Использование: script.py <домен>"
-    ["missing_packages"]="Отсутствуют следующие Python-библиотеки: "
-    ["installing_packages"]="Устанавливаем отсутствующие Python-библиотеки..."
-    ["wget_missing"]="wget не установлен. Пожалуйста, установите wget и попробуйте снова."
-    ["install_pip"]="Устанавливаем pip3 с помощью ensurepip..."
-    ["install_pip_fail"]="Не удалось установить pip3. Установите вручную, или попробуйте перезапустить этот скрипт"
-)
-
-LANG_CHOICE=1
-
-print_message() {
-    local key=$1
-    if [ "$LANG_CHOICE" = "1" ]; then
-        echo -e "${MESSAGES_EN[$key]}"
-    else
-        echo -e "${MESSAGES_RU[$key]}"
-    fi
-}
-
-choose_language() {
-    echo -e "${BLUE}${MESSAGES_EN["select_language"]}${NC}"
-    echo -e "${GREEN}${MESSAGES_EN["option1"]}${NC}"
-    echo -e "${GREEN}${MESSAGES_EN["option2"]}${NC}"
-    read -p "$(echo -e "${YELLOW}Enter your choice [1-2]: ${NC}")" input
-
-    case $input in
-        1)
-            LANG_CHOICE=1
-            ;;
-        2)
-            LANG_CHOICE=2
-            ;;
-        "")
-            LANG_CHOICE=1
-            print_message "default_lang"
-            ;;
-        *)
-            print_message "invalid_option"
-            ;;
-    esac
-    echo ""
-}
-
-install_pip3() {
-    print_message "install_pip"
-    python3 -m ensurepip --upgrade &> /dev/null
-    if ! command -v pip3 &> /dev/null; then
-        wget https://bootstrap.pypa.io/get-pip.py -O /tmp/get-pip.py &> /dev/null
-        python3 /tmp/get-pip.py &> /dev/null
-        rm /tmp/get-pip.py
-    fi
-
-    if ! command -v pip3 &> /dev/null; then
-        print_message "install_pip_fail"
-        exit 1
-    fi
-}
-
-install_python_and_packages() {
-    print_message "update_python"
-    if command -v apt-get &> /dev/null; then
-        sudo apt-get update -y &> /dev/null
-        sudo apt-get install -y python3 python3-pip &> /dev/null
-    elif command -v yum &> /dev/null; then
-        sudo yum install -y python3 python3-pip &> /dev/null
-    elif command -v dnf &> /dev/null; then
-        sudo dnf install -y python3 python3-pip &> /dev/null
-    else
-        print_message "package_manager_fail"
-        exit 1
-    fi
-
-    if ! command -v python3 &> /dev/null; then
-        print_message "install_fail"
-        exit 1
-    fi
-
-    if ! command -v pip3 &> /dev/null; then
-        install_pip3
-    fi
-}
-
-check_and_install_packages() {
-    required_packages=("sys" "subprocess" "requests" "time" "threading" "socket" "shutil" "json" "rich")
-    missing_packages=()
-
-    for package in "${required_packages[@]}"; do
-        if ! python3 -c "import $package" &> /dev/null; then
-            missing_packages+=("$package")
-        fi
+  else
+    echo -e "${RED}Сайт не подходит как SNI для Reality по следующим причинам:${RESET}"
+    for reason in "${reasons[@]}"; do
+      echo -e "${YELLOW}- $reason${RESET}"
     done
-
-    if [ ${#missing_packages[@]} -ne 0 ]; then
-        print_message "missing_packages"
-        echo -e "${YELLOW}${missing_packages[@]}${NC}"
-        print_message "installing_packages"
-        for package in "${missing_packages[@]}"; do
-            pip3 install "$package" &> /dev/null
-            if [ $? -ne 0 ]; then
-                echo -e "${RED}Failed to install package: $package${NC}"
-            fi
-        done
+    if [ ${#positives[@]} -gt 0 ]; then
+      echo -e "\n${GREEN}Положительные моменты:${RESET}"
+      for positive in "${positives[@]}"; do
+        echo -e "${GREEN}- $positive${RESET}"
+      done
     fi
+  fi
 }
 
-run_python_script() {
-    if [ "$LANG_CHOICE" = "1" ]; then
-        SCRIPT_URL="https://dignezzz.github.io/server/sni.py"
-    else
-        SCRIPT_URL="https://dignezzz.github.io/server/sni_ru.py"
-    fi
-
-    if ! command -v wget &> /dev/null; then
-        print_message "wget_missing"
-        exit 1
-    fi
-
-    python3 <(wget -qO- "$SCRIPT_URL") "$@"
-}
-
-choose_language
-
-if ! command -v python3 &> /dev/null || ! command -v pip3 &> /dev/null; then
-    install_python_and_packages
+# Проверка, введен ли домен
+if [ -z "$1" ]; then
+  echo -e "${RED}Использование: $0 <домен>${RESET}"
+  exit 1
 fi
 
-check_and_install_packages
+DOMAIN=$1
 
-run_python_script "$@"
+# Проверка необходимых утилит и установка при необходимости
+check_and_install_command openssl
+check_and_install_command curl
+check_and_install_command dig
+check_and_install_command whois
+
+# Выполнение проверок
+check_tls
+check_http_version
+check_redirect
+check_cdn
+
+# Итоговая проверка
+check_sni_for_reality
