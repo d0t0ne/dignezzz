@@ -213,9 +213,10 @@ function check_cdn() {
   echo -e "${GREEN}CDN не используется${RESET}"
 }
 
-# Функция для вывода результатов проверки
+# Функция для вывода результатов проверки с измененной логикой
 function check_dest_for_reality() {
   local reasons=()
+  local negatives=()
   local positives=()
 
   # Проверка рейтинга по пингу
@@ -223,38 +224,47 @@ function check_dest_for_reality() {
     if [ $RATING -ge 3 ]; then
       positives+=("Рейтинг по пингу: ${RATING}/5")
     else
-      reasons+=("Рейтинг по пингу ниже 3 (${RATING}/5)")
+      negatives+=("Рейтинг по пингу ниже 3 (${RATING}/5)")
     fi
   else
-    reasons+=("Не удалось выполнить пинг до хоста")
+    negatives+=("Не удалось выполнить пинг до хоста")
   fi
 
   # Проверка TLS 1.3
   if [ "$TLS_RESULT" = true ]; then
     positives+=("Поддерживается TLS 1.3")
   else
-    reasons+=("Не поддерживается TLS 1.3")
+    negatives+=("Не поддерживается TLS 1.3")
   fi
 
   # Проверка CDN
   if [ "$CDN_RESULT" = false ]; then
     positives+=("CDN не используется")
   else
-    reasons+=("Обнаружено использование CDN")
+    negatives+=("Использование CDN")
   fi
 
   echo -e "\n${CYAN}===== Результаты проверки =====${RESET}"
 
-  if [ ${#reasons[@]} -eq 0 ]; then
+  if [ ${#negatives[@]} -eq 0 ]; then
     echo -e "${GREEN}Сайт подходит как dest для Reality по следующим причинам:${RESET}"
     for positive in "${positives[@]}"; do
       echo -e "${GREEN}- $positive${RESET}"
     done
   else
-    echo -e "${RED}Сайт не подходит как dest для Reality по следующим причинам:${RESET}"
-    for reason in "${reasons[@]}"; do
-      echo -e "${YELLOW}- $reason${RESET}"
-    done
+    # Проверяем, является ли единственным отрицательным моментом использование CDN
+    if [ ${#negatives[@]} -eq 1 ] && [ "${negatives[0]}" == "Использование CDN" ]; then
+      echo -e "${YELLOW}Сайт не рекомендуется по следующим причинам:${RESET}"
+      for negative in "${negatives[@]}"; do
+        echo -e "${YELLOW}- $negative${RESET}"
+      done
+    else
+      echo -e "${RED}Сайт НЕ ПОДХОДИТ по следующим причинам:${RESET}"
+      for negative in "${negatives[@]}"; do
+        echo -e "${YELLOW}- $negative${RESET}"
+      done
+    fi
+
     if [ ${#positives[@]} -gt 0 ]; then
       echo -e "\n${GREEN}Положительные моменты:${RESET}"
       for positive in "${positives[@]}"; do
