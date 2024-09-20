@@ -41,7 +41,7 @@ declare -A MESSAGES_EN=(
     ["installing_packages"]="Installing missing Python packages..."
     ["wget_missing"]="wget is not installed. Please install wget and try again."
     ["install_pip"]="Installing pip3 using ensurepip..."
-    ["install_pip_fail"]="Failed to install pip3."
+    ["install_pip_fail"]="Failed to install pip3. Plz, install manually, or try to restart this script"
 )
 
 declare -A MESSAGES_RU=(
@@ -58,7 +58,7 @@ declare -A MESSAGES_RU=(
     ["installing_packages"]="Устанавливаем отсутствующие Python-библиотеки..."
     ["wget_missing"]="wget не установлен. Пожалуйста, установите wget и попробуйте снова."
     ["install_pip"]="Устанавливаем pip3 с помощью ensurepip..."
-    ["install_pip_fail"]="Не удалось установить pip3."
+    ["install_pip_fail"]="Не удалось установить pip3. Установите вручную, или попробуйте перезапустить этот скрипт"
 )
 
 LANG_CHOICE=1
