@@ -1,7 +1,5 @@
 #!/bin/bash
 clear
-
-# Сообщения только на английском по умолчанию
 declare -A MESSAGES_EN=(
     ["select_language"]="Select Language:"
     ["option1"]="1) English (default)"
@@ -34,7 +32,7 @@ declare -A MESSAGES_RU=(
     ["installing_packages"]="Устанавливаем отсутствующие Python-библиотеки..."
 )
 
-# По умолчанию используем английский язык
+
 LANG_CHOICE=1
 
 print_message() {
@@ -52,32 +50,40 @@ choose_language_with_timer() {
     echo -e "${MESSAGES_EN["option2"]}"
     echo "${MESSAGES_EN["timeout_message"]}"
 
-    for ((i=5; i>0; i--)); do
-        echo -ne "Time remaining: $i seconds\r"
-        if read -t 1 -n 1 input; then
-            case $input in
-                1)
-                    LANG_CHOICE=1
-                    echo ""
-                    break
-                    ;;
-                2)
-                    LANG_CHOICE=2
-                    echo ""
-                    break
-                    ;;
-                *)
-                    echo ""
-                    print_message "invalid_option"
-                    LANG_CHOICE=1
-                    break
-                    ;;
-            esac
-        fi
-    done
+    countdown() {
+        for i in {5..1}; do
+            echo -ne "Time remaining: $i seconds\r"
+            sleep 1
+        done
+    }
 
-    if [ "$LANG_CHOICE" = "1" ]; then
-        print_message "choose_language_timeout"
+    countdown &
+    COUNTDOWN_PID=$!
+
+
+    read -t5 -p "Enter your choice [1-2]: " input
+
+
+    kill $COUNTDOWN_PID 2>/dev/null
+    echo "" 
+
+    if [ $? -gt 128 ]; then
+
+        LANG_CHOICE=1
+        print_message "default_lang"
+    else
+        case $input in
+            1)
+                LANG_CHOICE=1
+                ;;
+            2)
+                LANG_CHOICE=2
+                ;;
+            *)
+                print_message "invalid_option"
+                LANG_CHOICE=1
+                ;;
+        esac
     fi
 }
 
@@ -137,4 +143,4 @@ if ! command -v python3 &> /dev/null; then
 fi
 
 check_and_install_packages
-run_python_script
+run_python_script "$@"
