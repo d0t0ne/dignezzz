@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write  # Изменено на 'write' для возможности коммита изменений
+  contents: write  # Для возможности коммита изменений
   pages: write
   id-token: write
 
@@ -39,13 +39,15 @@ jobs:
             done
             echo "" >> README.md  # Добавляем пустую строку после таблицы
           done
+          echo "" >> README.md
+          echo "_Last updated at $(date)_ " >> README.md  # Добавляем метку с датой и временем
 
       - name: Commit README changes
         run: |
           git config user.name "GitHub Action"
           git config user.email "dignezzz@gmail.com"
           git add README.md
-          git commit -m "Auto-generate README with script links at $(date)"
+          git commit -m "Auto-generate README with script links at $(date)" || echo "No changes to commit"
           git push
 
       - name: Setup Pages
