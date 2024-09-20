@@ -46,7 +46,7 @@ declare -A MESSAGES_EN=(
 
 declare -A MESSAGES_RU=(
     ["select_language"]="Выберите язык:"
-    ["option1"]="1) Английский (по умолчанию)"
+    ["option1"]="1) English (default)"
     ["option2"]="2) Русский"
     ["invalid_option"]="Неверный выбор. Продолжаем на Английском."
     ["update_python"]="Устанавливаем Python 3 и необходимые пакеты..."
