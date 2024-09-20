@@ -24,7 +24,7 @@ function check_and_install_command() {
   fi
 }
 
-# Исправленная функция проверки поддержки TLS 1.3 и вывода используемой версии TLS
+# функция проверки поддержки TLS 1.3 и вывода используемой версии TLS
 function check_tls() {
   echo -e "${CYAN}Проверка поддержки TLS для $DOMAIN...${RESET}"
   tls_version=$(echo | timeout 5 openssl s_client -connect $DOMAIN:443 -tls1_3 2>&1)
@@ -32,7 +32,7 @@ function check_tls() {
     echo -e "${GREEN}TLS 1.3 поддерживается${RESET}"
     TLS_RESULT=true
   else
-    # Попытка соединиться без указания версии TLS
+    
     tls_output=$(echo | timeout 5 openssl s_client -connect $DOMAIN:443 2>&1)
     protocol_line=$(echo "$tls_output" | grep -E "Protocol *:")
     if [[ -n $protocol_line ]]; then
@@ -51,7 +51,7 @@ function check_http_version() {
   HTTP2_SUPPORTED=false
   HTTP3_SUPPORTED=false
 
-  # Проверка HTTP/2 с помощью curl
+  # Проверка H/2 с помощью curl
   http2_check=$(curl -I -s --max-time 5 --http2 https://$DOMAIN 2>/dev/null | grep -i "^HTTP/2")
   if [[ -n $http2_check ]]; then
     echo -e "${GREEN}HTTP/2 поддерживается (через curl)${RESET}"
@@ -60,9 +60,9 @@ function check_http_version() {
     echo -e "${YELLOW}HTTP/2 не поддерживается (через curl)${RESET}"
   fi
 
-  # Дополнительные проверки для HTTP/2, если не найдено
+  # Дополнительные проверки если не найдено
   if [ "$HTTP2_SUPPORTED" != "true" ]; then
-    # Использование openssl для проверки ALPN протоколов
+    # Использование openssl 
     alpn_protocols=$(echo | timeout 5 openssl s_client -alpn h2 -connect $DOMAIN:443 2>/dev/null | grep "ALPN protocol")
     if echo "$alpn_protocols" | grep -q "protocols:.*h2"; then
       echo -e "${GREEN}HTTP/2 поддерживается (через openssl)${RESET}"
@@ -98,7 +98,7 @@ function check_http_version() {
 
   # Проверка поддержки HTTP/3
 
-  # Метод 1: Использование openssl для проверки ALPN протоколов
+  # Использование openssl для проверки ALPN протоколов
   alpn_protocols=$(echo | timeout 5 openssl s_client -alpn h3 -connect $DOMAIN:443 2>/dev/null | grep "ALPN protocol")
   if echo "$alpn_protocols" | grep -iq "protocols:.*h3"; then
     echo -e "${GREEN}HTTP/3 поддерживается (через openssl)${RESET}"
@@ -141,7 +141,6 @@ function check_redirect() {
     REDIRECT_RESULT=false
   fi
 }
-
 # Функция для анализа HTTP-заголовков
 function check_cdn_headers() {
   echo -e "${CYAN}Анализ HTTP-заголовков для определения CDN...${RESET}"
@@ -153,7 +152,30 @@ function check_cdn_headers() {
   elif echo "$headers" | grep -iq "akamai"; then
     echo -e "${YELLOW}Используется CDN: Akamai (по заголовкам)${RESET}"
     CDN_RESULT=true
-  # Добавьте дополнительные проверки для других CDN
+  elif echo "$headers" | grep -iq "fastly"; then
+    echo -e "${YELLOW}Используется CDN: Fastly (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "incapsula"; then
+    echo -e "${YELLOW}Используется CDN: Imperva Incapsula (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "sucuri"; then
+    echo -e "${YELLOW}Используется CDN: Sucuri (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "stackpath"; then
+    echo -e "${YELLOW}Используется CDN: StackPath (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "cdn77"; then
+    echo -e "${YELLOW}Используется CDN: CDN77 (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "edgecast"; then
+    echo -e "${YELLOW}Используется CDN: Verizon Edgecast (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "keycdn"; then
+    echo -e "${YELLOW}Используется CDN: KeyCDN (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "cdn"; then
+    echo -e "${YELLOW}Обнаружены признаки использования CDN (по заголовкам)${RESET}"
+    CDN_RESULT=true
   else
     echo -e "${GREEN}По заголовкам CDN не обнаружен${RESET}"
   fi
@@ -169,15 +191,41 @@ function check_cdn_asn() {
   fi
   asn_info=$(whois -h whois.cymru.com " -v $ip" 2>/dev/null | tail -n1)
   asn=$(echo $asn_info | awk '{print $1}')
-  owner=$(echo $asn_info | awk '{$1=""; $2=""; print $0}')
-  
+  owner=$(echo $asn_info | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
+
   if echo "$owner" | grep -iq "Cloudflare"; then
     echo -e "${YELLOW}Используется CDN: Cloudflare (по ASN)${RESET}"
     CDN_RESULT=true
   elif echo "$owner" | grep -iq "Akamai"; then
     echo -e "${YELLOW}Используется CDN: Akamai (по ASN)${RESET}"
     CDN_RESULT=true
-  # Добавьте дополнительные проверки для других CDN
+  elif echo "$owner" | grep -iq "Fastly"; then
+    echo -e "${YELLOW}Используется CDN: Fastly (по ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "Incapsula"; then
+    echo -e "${YELLOW}Используется CDN: Imperva Incapsula (по ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "Sucuri"; then
+    echo -e "${YELLOW}Используется CDN: Sucuri (по ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "StackPath"; then
+    echo -e "${YELLOW}Используется CDN: StackPath (по ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "CDN77"; then
+    echo -e "${YELLOW}Используется CDN: CDN77 (по ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "Edgecast"; then
+    echo -e "${YELLOW}Используется CDN: Verizon Edgecast (по ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "KeyCDN"; then
+    echo -e "${YELLOW}Используется CDN: KeyCDN (по ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "Alibaba"; then
+    echo -e "${YELLOW}Используется CDN: Alibaba Cloud CDN (по ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "Tencent"; then
+    echo -e "${YELLOW}Используется CDN: Tencent Cloud CDN (по ASN)${RESET}"
+    CDN_RESULT=true
   else
     echo -e "${GREEN}По ASN CDN не обнаружен${RESET}"
   fi
@@ -201,7 +249,33 @@ function check_cdn_ipinfo() {
   elif echo "$org" | grep -iq "Akamai"; then
     echo -e "${YELLOW}Используется CDN: Akamai (через ipinfo.io)${RESET}"
     CDN_RESULT=true
-  # Добавьте дополнительные проверки для других CDN
+  elif echo "$org" | grep -iq "Fastly"; then
+    echo -e "${YELLOW}Используется CDN: Fastly (через ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "Incapsula"; then
+    echo -e "${YELLOW}Используется CDN: Imperva Incapsula (через ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "Sucuri"; then
+    echo -e "${YELLOW}Используется CDN: Sucuri (через ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "StackPath"; then
+    echo -e "${YELLOW}Используется CDN: StackPath (через ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "CDN77"; then
+    echo -e "${YELLOW}Используется CDN: CDN77 (через ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "Edgecast"; then
+    echo -e "${YELLOW}Используется CDN: Verizon Edgecast (через ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "KeyCDN"; then
+    echo -e "${YELLOW}Используется CDN: KeyCDN (через ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "Alibaba"; then
+    echo -e "${YELLOW}Используется CDN: Alibaba Cloud CDN (через ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "Tencent"; then
+    echo -e "${YELLOW}Используется CDN: Tencent Cloud CDN (через ipinfo.io)${RESET}"
+    CDN_RESULT=true
   else
     echo -e "${GREEN}CDN не обнаружен через ipinfo.io${RESET}"
   fi
@@ -218,7 +292,33 @@ function check_cdn_certificate() {
   elif echo "$cert_info" | grep -iq "Akamai"; then
     echo -e "${YELLOW}Используется CDN: Akamai (по SSL-сертификату)${RESET}"
     CDN_RESULT=true
-  # Добавьте дополнительные проверки для других CDN
+  elif echo "$cert_info" | grep -iq "Fastly"; then
+    echo -e "${YELLOW}Используется CDN: Fastly (по SSL-сертификату)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "Incapsula"; then
+    echo -e "${YELLOW}Используется CDN: Imperva Incapsula (по SSL-сертификату)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "Sucuri"; then
+    echo -e "${YELLOW}Используется CDN: Sucuri (по SSL-сертификату)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "StackPath"; then
+    echo -e "${YELLOW}Используется CDN: StackPath (по SSL-сертификату)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "CDN77"; then
+    echo -e "${YELLOW}Используется CDN: CDN77 (по SSL-сертификату)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "Edgecast"; then
+    echo -e "${YELLOW}Используется CDN: Verizon Edgecast (по SSL-сертификату)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "KeyCDN"; then
+    echo -e "${YELLOW}Используется CDN: KeyCDN (по SSL-сертификату)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "Alibaba"; then
+    echo -e "${YELLOW}Используется CDN: Alibaba Cloud CDN (по SSL-сертификату)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "Tencent"; then
+    echo -e "${YELLOW}Используется CDN: Tencent Cloud CDN (по SSL-сертификату)${RESET}"
+    CDN_RESULT=true
   else
     echo -e "${GREEN}CDN не обнаружен по SSL-сертификату${RESET}"
   fi
