@@ -1,5 +1,6 @@
 #!/bin/bash
-clear
+
+
 declare -A MESSAGES_EN=(
     ["select_language"]="Select Language:"
     ["option1"]="1) English (default)"
@@ -8,9 +9,7 @@ declare -A MESSAGES_EN=(
     ["update_python"]="Installing Python 3 and required packages..."
     ["package_manager_fail"]="Failed to determine package manager. Please install Python 3 manually."
     ["install_fail"]="Failed to install Python 3 automatically. Please install it manually and try again."
-    ["default_lang"]="No input detected. Defaulting to English."
-    ["choose_language_timeout"]="No input detected. Defaulting to English."
-    ["timeout_message"]="You have 5 seconds to choose a language. Default is English."
+    ["default_lang"]="Defaulting to English."
     ["usage"]="Usage: script.py <domain>"
     ["missing_packages"]="The following Python packages are missing: "
     ["installing_packages"]="Installing missing Python packages..."
@@ -24,9 +23,7 @@ declare -A MESSAGES_RU=(
     ["update_python"]="Устанавливаем Python 3 и необходимые пакеты..."
     ["package_manager_fail"]="Не удалось определить пакетный менеджер. Установите Python 3 вручную."
     ["install_fail"]="Не удалось установить Python 3 автоматически. Установите его вручную и повторите попытку."
-    ["default_lang"]="Ввод не получен. По умолчанию выбран Английский."
-    ["choose_language_timeout"]="Ввод не получен. По умолчанию выбран Английский."
-    ["timeout_message"]="У вас есть 5 секунд для выбора языка. По умолчанию выбран Английский."
+    ["default_lang"]="По умолчанию выбран Английский."
     ["usage"]="Использование: script.py <домен>"
     ["missing_packages"]="Отсутствуют следующие Python-библиотеки: "
     ["installing_packages"]="Устанавливаем отсутствующие Python-библиотеки..."
@@ -44,47 +41,28 @@ print_message() {
     fi
 }
 
-choose_language_with_timer() {
-    echo -e "${MESSAGES_EN["select_language"]}"
-    echo -e "${MESSAGES_EN["option1"]}"
-    echo -e "${MESSAGES_EN["option2"]}"
-    echo "${MESSAGES_EN["timeout_message"]}"
+choose_language() {
+    while true; do
+        echo -e "${MESSAGES_EN["select_language"]}"
+        echo -e "${MESSAGES_EN["option1"]}"
+        echo -e "${MESSAGES_EN["option2"]}"
+        read -p "Enter your choice [1-2]: " input
 
-    countdown() {
-        for i in {5..1}; do
-            echo -ne "Time remaining: $i seconds\r"
-            sleep 1
-        done
-    }
-
-    countdown &
-    COUNTDOWN_PID=$!
-
-
-    read -t5 -p "Enter your choice [1-2]: " input
-
-
-    kill $COUNTDOWN_PID 2>/dev/null
-    echo "" 
-
-    if [ $? -gt 128 ]; then
-
-        LANG_CHOICE=1
-        print_message "default_lang"
-    else
         case $input in
             1)
                 LANG_CHOICE=1
+                break
                 ;;
             2)
                 LANG_CHOICE=2
+                break
                 ;;
             *)
                 print_message "invalid_option"
-                LANG_CHOICE=1
                 ;;
         esac
-    fi
+    done
+    echo "" 
 }
 
 install_python_and_packages() {
@@ -136,11 +114,17 @@ run_python_script() {
     python3 <(wget -qO- "$SCRIPT_URL") "$@"
 }
 
-choose_language_with_timer
+
+choose_language
+
 
 if ! command -v python3 &> /dev/null; then
     install_python_and_packages
 fi
 
+
 check_and_install_packages
+
+clear
+
 run_python_script "$@"
