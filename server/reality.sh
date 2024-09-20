@@ -4,7 +4,7 @@
 check_python_and_run() {
     local py_script=$1
     local bash_script=$2
-    local domain_port=$3
+    local domain=$3
 
     if command -v python3 &>/dev/null; then
         echo "Python3 is installed. Checking required libraries..."
@@ -27,15 +27,15 @@ except ImportError as e:
 EOF
 
         if [ $? -eq 0 ]; then
-            echo "All libraries are available. Running python script..."
-            python3 <(wget -qO- "$py_script") "$domain_port" &
+
+            python3 <(wget -qO- "$py_script") "$domain"
         else
-            echo "Missing libraries. Running bash script..."
-            bash <(wget -qO- "$bash_script") "$domain_port" &
+
+            bash <(wget -qO- "$bash_script") "$domain"
         fi
     else
-        echo "Python3 is not installed. Running bash script..."
-        bash <(wget -qO- "$bash_script") "$domain_port" &
+
+        bash <(wget -qO- "$bash_script") "$domain"
     fi
 }
 
@@ -46,6 +46,7 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
+domain=$1
 domain_port=$1
 
 # Check if a port argument is provided
@@ -61,21 +62,23 @@ NC='\033[0m' # No color
 # Menu for user selection
 echo -e "The domain being checked is: ${GREEN}$domain_port${NC}"
 echo -e "Select an option to check:"
-echo -e "1. Check host '$domain_port' for use as ${GREEN}Reality ServerName${NC}"
+echo -e "1. Check host '$domain' for use as ${GREEN}Reality ServerName${NC} (domain only)"
 echo -e "2. Check host '$domain_port' for use as ${RED}Reality Dest${NC}"
 
 read -p "Enter your choice (1 or 2): " choice
 
 case $choice in
     1)
-        echo -e "You selected: Checking host '$domain_port' for ${GREEN}Reality ServerName${NC}"
-        check_python_and_run "https://dignezzz.github.io/server/sni.py" "https://dignezzz.github.io/server/sni.sh" "$domain_port"
+        echo -e "You selected: Checking host ${RED}'$domain'${NC} for Reality ServerName${NC}"
+        check_python_and_run "https://dignezzz.github.io/server/sni.py" "https://dignezzz.github.io/server/sni.sh" "$domain"
         ;;
     2)
-        echo -e "You selected: Checking host '$domain_port' for ${RED}Reality Dest${NC}"
+        echo -e "You selected: Checking host ${RED}'$domain_port'${NC} for ${GREEN}Reality Dest${NC}"
         check_python_and_run "https://dignezzz.github.io/server/dest.py" "https://dignezzz.github.io/server/dest.sh" "$domain_port"
         ;;
     *)
         echo "Invalid choice. Please enter 1 or 2."
         ;;
 esac
+
+
