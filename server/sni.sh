@@ -1,14 +1,14 @@
 #!/bin/bash
-clear
 
-# Определение цветовых кодов для улучшенного визуального восприятия
+
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # Без цвета
+NC='\033[0m'
 
-# Проверка наличия необходимых утилит
+
 check_dependencies() {
     dependencies=("wget" "sudo" "python3" "pip3")
     missing=()
@@ -25,10 +25,9 @@ check_dependencies() {
     fi
 }
 
-# Вызов функции проверки зависимостей
 check_dependencies
 
-# Сообщения на английском по умолчанию
+
 declare -A MESSAGES_EN=(
     ["select_language"]="Select Language:"
     ["option1"]="1) English (default)"
@@ -59,10 +58,10 @@ declare -A MESSAGES_RU=(
     ["wget_missing"]="wget не установлен. Пожалуйста, установите wget и попробуйте снова."
 )
 
-# По умолчанию используем английский язык
+
 LANG_CHOICE=1
 
-# Функция для вывода сообщений с учётом выбранного языка
+
 print_message() {
     local key=$1
     if [ "$LANG_CHOICE" = "1" ]; then
@@ -72,7 +71,7 @@ print_message() {
     fi
 }
 
-# Функция выбора языка
+
 choose_language() {
     echo -e "${BLUE}${MESSAGES_EN["select_language"]}${NC}"
     echo -e "${GREEN}${MESSAGES_EN["option1"]}${NC}"
@@ -87,19 +86,19 @@ choose_language() {
             LANG_CHOICE=2
             ;;
         "")
-            # Пользователь нажал Enter без ввода
+         
             LANG_CHOICE=1
             print_message "default_lang"
             ;;
         *)
-            # Некорректный ввод
+  
             print_message "invalid_option"
             ;;
     esac
-    echo ""  # Переход на новую строку после выбора
+    echo ""  
 }
 
-# Функция установки Python и необходимых пакетов
+
 install_python_and_packages() {
     print_message "update_python"
     if command -v apt-get &> /dev/null; then
@@ -120,7 +119,7 @@ install_python_and_packages() {
     fi
 }
 
-# Функция проверки и установки недостающих Python-библиотек
+
 check_and_install_packages() {
     required_packages=("sys" "subprocess" "requests" "time" "threading" "socket" "shutil" "json" "rich")
     missing_packages=()
@@ -141,7 +140,7 @@ check_and_install_packages() {
     fi
 }
 
-# Функция запуска Python-скрипта
+
 run_python_script() {
     if [ "$LANG_CHOICE" = "1" ]; then
         SCRIPT_URL="https://dignezzz.github.io/server/sni.py"
@@ -149,28 +148,26 @@ run_python_script() {
         SCRIPT_URL="https://dignezzz.github.io/server/sni_ru.py"
     fi
 
-    # Проверка наличия wget
+
     if ! command -v wget &> /dev/null; then
         print_message "wget_missing"
         exit 1
     fi
 
-    # Загрузка и запуск Python-скрипта
+
     python3 <(wget -qO- "$SCRIPT_URL") "$@"
 }
 
-# Основная логика скрипта
 
-# Запуск выбора языка
 choose_language
 
-# Проверка и установка Python, если необходимо
+
 if ! command -v python3 &> /dev/null; then
     install_python_and_packages
 fi
 
-# Проверка и установка необходимых Python-библиотек
-check_and_install_packages
 
-# Запуск Python-скрипта с переданными аргументами
+check_and_install_packages
+clear
+
 run_python_script "$@"
