@@ -1,184 +1,360 @@
 #!/bin/bash
-clear
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-trap "echo -e '\n${RED}Script interrupted by user.${NC}' && exit 1" SIGINT
-
-check_dependencies() {
-    dependencies=("wget" "sudo")
-    missing=()
-    for cmd in "${dependencies[@]}"; do
-        if ! command -v "$cmd" &> /dev/null; then
-            missing+=("$cmd")
-        fi
-    done
-
-    if [ ${#missing[@]} -ne 0 ]; then
-        echo -e "${RED}The following dependencies are missing:${NC} ${missing[@]}"
-        echo -e "${YELLOW}Please install them manually and re-run the script.${NC}"
-        exit 1
-    fi
-}
-
-check_dependencies
-
-declare -A MESSAGES_EN=(
-    ["select_language"]="Select Language:"
-    ["option1"]="1) English (default)"
-    ["option2"]="2) Русский"
-    ["invalid_option"]="Invalid option. Continuing with English."
-    ["update_python"]="Installing Python 3 and required packages..."
-    ["package_manager_fail"]="Failed to determine package manager. Please install Python 3 manually."
-    ["install_fail"]="Failed to install Python 3 automatically. Please install it manually and try again."
-    ["default_lang"]="Defaulting to English."
-    ["usage"]="Usage: script.py <domain>"
-    ["missing_packages"]="The following Python packages are missing: "
-    ["installing_packages"]="Installing missing Python packages..."
-    ["wget_missing"]="wget is not installed. Please install wget and try again."
-    ["install_pip"]="Installing pip3 using ensurepip..."
-    ["install_pip_fail"]="Failed to install pip3."
-)
-
-declare -A MESSAGES_RU=(
-    ["select_language"]="Выберите язык:"
-    ["option1"]="1) English (default)"
-    ["option2"]="2) Русский"
-    ["invalid_option"]="Неверный выбор. Продолжаем на Английском."
-    ["update_python"]="Устанавливаем Python 3 и необходимые пакеты..."
-    ["package_manager_fail"]="Не удалось определить пакетный менеджер. Установите Python 3 вручную."
-    ["install_fail"]="Не удалось установить Python 3 автоматически. Установите его вручную и повторите попытку."
-    ["default_lang"]="По умолчанию выбран Английский."
-    ["usage"]="Использование: script.py <домен>"
-    ["missing_packages"]="Отсутствуют следующие Python-библиотеки: "
-    ["installing_packages"]="Устанавливаем отсутствующие Python-библиотеки..."
-    ["wget_missing"]="wget не установлен. Пожалуйста, установите wget и попробуйте снова."
-    ["install_pip"]="Устанавливаем pip3 с помощью ensurepip..."
-    ["install_pip_fail"]="Не удалось установить pip3."
-)
-
-LANG_CHOICE=1
-
-print_message() {
-    local key=$1
-    if [ "$LANG_CHOICE" = "1" ]; then
-        echo -e "${MESSAGES_EN[$key]}"
-    else
-        echo -e "${MESSAGES_RU[$key]}"
-    fi
-}
-
-choose_language() {
-    echo -e "${BLUE}${MESSAGES_EN["select_language"]}${NC}"
-    echo -e "${GREEN}${MESSAGES_EN["option1"]}${NC}"
-    echo -e "${GREEN}${MESSAGES_EN["option2"]}${NC}"
-    read -p "$(echo -e "${YELLOW}Enter your choice [1-2]: ${NC}")" input
-
-    case $input in
-        1)
-            LANG_CHOICE=1
-            ;;
-        2)
-            LANG_CHOICE=2
-            ;;
-        "")
-            LANG_CHOICE=1
-            print_message "default_lang"
-            ;;
-        *)
-            print_message "invalid_option"
-            ;;
-    esac
-    echo ""
-}
-
-install_pip3() {
-    print_message "install_pip"
-    python3 -m ensurepip --upgrade &> /dev/null
-    if ! command -v pip3 &> /dev/null; then
-        wget https://bootstrap.pypa.io/get-pip.py -O /tmp/get-pip.py &> /dev/null
-        python3 /tmp/get-pip.py &> /dev/null
-        rm /tmp/get-pip.py
-    fi
-
-    if ! command -v pip3 &> /dev/null; then
-        print_message "install_pip_fail"
-        exit 1
-    fi
-}
-
-install_python_and_packages() {
-    print_message "update_python"
-    if command -v apt-get &> /dev/null; then
-        sudo apt-get update -y &> /dev/null
-        sudo apt-get install -y python3 python3-pip &> /dev/null
-    elif command -v yum &> /dev/null; then
-        sudo yum install -y python3 python3-pip &> /dev/null
-    elif command -v dnf &> /dev/null; then
-        sudo dnf install -y python3 python3-pip &> /dev/null
-    else
-        print_message "package_manager_fail"
-        exit 1
-    fi
-
-    if ! command -v python3 &> /dev/null; then
-        print_message "install_fail"
-        exit 1
-    fi
-
-    if ! command -v pip3 &> /dev/null; then
-        install_pip3
-    fi
-}
-
-check_and_install_packages() {
-    required_packages=("sys" "subprocess" "requests" "time" "threading" "socket" "shutil" "json" "rich")
-    missing_packages=()
-
-    for package in "${required_packages[@]}"; do
-        if ! python3 -c "import $package" &> /dev/null; then
-            missing_packages+=("$package")
-        fi
-    done
-
-    if [ ${#missing_packages[@]} -ne 0 ]; then
-        print_message "missing_packages"
-        echo -e "${YELLOW}${missing_packages[@]}${NC}"
-        print_message "installing_packages"
-        for package in "${missing_packages[@]}"; do
-            pip3 install "$package" &> /dev/null
-            if [ $? -ne 0 ]; then
-                echo -e "${RED}Failed to install package: $package${NC}"
-            fi
-        done
-    fi
-}
-
-run_python_script() {
-    if [ "$LANG_CHOICE" = "1" ]; then
-        SCRIPT_URL="https://dignezzz.github.io/server/dest.py"
-    else
-        SCRIPT_URL="https://dignezzz.github.io/server/dest_ru.py"
-    fi
-
-    if ! command -v wget &> /dev/null; then
-        print_message "wget_missing"
-        exit 1
-    fi
-
-    python3 <(wget -qO- "$SCRIPT_URL") "$@"
-}
-
-choose_language
-
-if ! command -v python3 &> /dev/null || ! command -v pip3 &> /dev/null; then
-    install_python_and_packages
+# Проверка, что скрипт запущен с правами суперпользователя для установки пакетов
+if [[ "$EUID" -ne 0 ]]; then
+  echo -e "\e[33mУтилиты могут потребовать установки. Пожалуйста, запустите скрипт с правами sudo.\e[0m"
 fi
 
-check_and_install_packages
+# Функция для проверки и установки необходимых команд
+check_and_install_command() {
+  local cmd=$1
+  local pkg=$2
+  if ! command -v "$cmd" &> /dev/null; then
+    echo -e "\e[33mУтилита $cmd не найдена. Устанавливаем...\e[0m"
+    sudo apt-get update
+    sudo apt-get install -y "$pkg"
+    if ! command -v "$cmd" &> /dev/null; then
+      echo -e "\e[31mОшибка: не удалось установить $cmd. Пожалуйста, установите вручную.\e[0m"
+      exit 1
+    fi
+  fi
+}
 
-run_python_script "$@"
+# Проверка и установка необходимых утилит
+check_and_install_command "openssl" "openssl"
+check_and_install_command "curl" "curl"
+check_and_install_command "dig" "dnsutils"
+check_and_install_command "whois" "whois"
+check_and_install_command "ping" "iputils-ping"
+check_and_install_command "nc" "netcat"
+
+# Цветовые коды
+GREEN="\e[32m"
+YELLOW="\e[33m"
+RED="\e[31m"
+CYAN="\e[36m"
+BOLD="\e[1m"
+RESET="\e[0m"
+
+# Инициализация результатов
+declare -A results
+results=(
+  ["domain"]=""
+  ["port"]=""
+  ["tls_supported"]=false
+  ["http2_supported"]=false
+  ["cdn_used"]=false
+  ["redirect_found"]=false
+  ["ping"]=""
+  ["rating"]=0
+  ["cdn_provider"]=""
+  ["cdns"]=""
+  ["negatives"]=""
+  ["positives"]=""
+)
+
+# Функция для проверки доступности порта
+check_port_availability() {
+  local domain=$1
+  local port=$2
+  timeout 5 bash -c "echo > /dev/tcp/$domain/$port" 2>/dev/null
+  return $?
+}
+
+# Функция для проверки поддержки TLS 1.3
+check_tls() {
+  local domain=$1
+  local port=$2
+  echo -ne "${CYAN}Проверка поддержки TLS 1.3...\e[0m\r"
+  output=$(echo | openssl s_client -connect "$domain:$port" -tls1_3 2>&1)
+  if echo "$output" | grep -q "TLSv1.3"; then
+    results["tls_supported"]=true
+    results["positives"]+="- TLS 1.3 поддерживается\n"
+    echo -e "${GREEN}TLS 1.3 поддерживается\e[0m"
+  else
+    tls_version=$(echo "$output" | grep -i "Protocol" | awk -F: '{print $2}' | tr -d ' ')
+    if [[ -n "$tls_version" ]]; then
+      results["negatives"]+="- TLS 1.3 не поддерживается (используется $tls_version)\n"
+      echo -e "${YELLOW}TLS 1.3 не поддерживается ($tls_version)\e[0m"
+    else
+      results["negatives"]+="- Не удалось определить версию TLS\n"
+      echo -e "${RED}Не удалось определить версию TLS\e[0m"
+    fi
+  fi
+}
+
+# Функция для проверки поддержки HTTP/2
+check_http2() {
+  local domain=$1
+  local port=$2
+  echo -ne "${CYAN}Проверка поддержки HTTP/2...\e[0m\r"
+  http2_output=$(curl -I -s --http2 "https://$domain:$port" 2>&1)
+  if echo "$http2_output" | grep -qi "HTTP/2"; then
+    results["http2_supported"]=true
+    results["positives"]+="- HTTP/2 поддерживается\n"
+    echo -e "${GREEN}HTTP/2 поддерживается\e[0m"
+  else
+    http_version=$(curl -I -s "https://$domain:$port" 2>/dev/null | grep -i "HTTP/" | awk '{print $1}')
+    if [[ -n "$http_version" ]]; then
+      results["negatives"]+="- HTTP/2 не поддерживается (используется $http_version)\n"
+      echo -e "${YELLOW}HTTP/2 не поддерживается ($http_version)\e[0m"
+    else
+      results["negatives"]+="- Не удалось определить версию HTTP\n"
+      echo -e "${RED}Не удалось определить версию HTTP\e[0m"
+    fi
+  fi
+}
+
+# Функция для проверки использования CDN
+check_cdn() {
+  local domain=$1
+  local port=$2
+  echo -ne "${CYAN}Проверка использования CDN...\e[0m\r"
+  declare -A cdn_providers=(
+    ["cloudflare"]="Cloudflare"
+    ["akamai"]="Akamai"
+    ["fastly"]="Fastly"
+    ["incapsula"]="Imperva Incapsula"
+    ["sucuri"]="Sucuri"
+    ["stackpath"]="StackPath"
+    ["cdn77"]="CDN77"
+    ["edgecast"]="Verizon Edgecast"
+    ["keycdn"]="KeyCDN"
+    ["azure"]="Microsoft Azure CDN"
+    ["aliyun"]="Alibaba Cloud CDN"
+    ["baidu"]="Baidu Cloud CDN"
+    ["tencent"]="Tencent Cloud CDN"
+  )
+  
+  headers=$(curl -I -s "https://$domain:$port" 2>/dev/null)
+  header_str=$(echo "$headers" | tr '[:upper:]' '[:lower:]')
+  
+  for key in "${!cdn_providers[@]}"; do
+    if echo "$header_str" | grep -q "$key"; then
+      results["cdn_used"]=true
+      results["cdn_provider"]="${cdn_providers[$key]}"
+      results["cdns"]+="${cdn_providers[$key]}, "
+      echo -e "${YELLOW}Используется CDN: ${cdn_providers[$key]}\e[0m"
+      return
+    fi
+  done
+  
+  results["positives"]+="- CDN не используется\n"
+  echo -e "${GREEN}CDN не используется\e[0m"
+}
+
+# Функция для проверки редиректов
+check_redirect() {
+  local domain=$1
+  local port=$2
+  echo -ne "${CYAN}Проверка редиректов...\e[0m\r"
+  redirect=$(curl -s -o /dev/null -w "%{redirect_url}" -L "https://$domain:$port" 2>/dev/null)
+  if [[ -n "$redirect" ]]; then
+    results["redirect_found"]=true
+    results["negatives"]+="- Найден редирект: $redirect\n"
+    echo -e "${YELLOW}Найден редирект: $redirect\e[0m"
+  else
+    results["positives"]+="- Редиректов не найдено\n"
+    echo -e "${GREEN}Редиректов не найдено\e[0m"
+  fi
+}
+
+# Функция для расчета пинга
+calculate_ping() {
+  local domain=$1
+  echo -ne "${CYAN}Расчет пинга...\e[0m\r"
+  ping_output=$(ping -c 5 "$domain" 2>/dev/null)
+  if [[ $? -eq 0 ]]; then
+    avg_ping=$(echo "$ping_output" | grep -i "rtt" | awk -F '/' '{print $5}')
+    if [[ -n "$avg_ping" ]]; then
+      results["ping"]="$avg_ping"
+      # Оценка рейтинга
+      if (( $(echo "$avg_ping <= 2" | bc -l) )); then
+        results["rating"]=5
+      elif (( $(echo "$avg_ping <= 3" | bc -l) )); then
+        results["rating"]=4
+      elif (( $(echo "$avg_ping <= 5" | bc -l) )); then
+        results["rating"]=3
+      elif (( $(echo "$avg_ping <= 8" | bc -l) )); then
+        results["rating"]=2
+      else
+        results["rating"]=1
+      fi
+      
+      if [[ ${results["rating"]} -ge 4 ]]; then
+        results["positives"]+="- Средний пинг: ${avg_ping} ms (Рейтинг: ${results["rating"]}/5)\n"
+        echo -e "${GREEN}Средний пинг: ${avg_ping} ms (Рейтинг: ${results["rating"]}/5)\e[0m"
+      else
+        results["negatives"]+="- Высокий пинг: ${avg_ping} ms (Рейтинг: ${results["rating"]}/5)\n"
+        echo -e "${YELLOW}Высокий пинг: ${avg_ping} ms (Рейтинг: ${results["rating"]}/5)\e[0m"
+      fi
+    else
+      results["negatives"]+="- Не удалось определить средний пинг\n"
+      echo -e "${RED}Не удалось определить средний пинг\e[0m"
+    fi
+  else
+    results["negatives"]+="- Не удалось выполнить пинг хоста\n"
+    echo -e "${RED}Не удалось выполнить пинг хоста\e[0m"
+  fi
+}
+
+# Функция для отображения результатов
+display_results() {
+  echo -e "\n${BOLD}${CYAN}===== Результаты проверки =====${RESET}\n"
+  
+  reasons=()
+  positives=()
+  
+  if [[ "${results["tls_supported"]}" == true ]]; then
+    positives+=("TLS 1.3 поддерживается")
+  else
+    reasons+=("TLS 1.3 не поддерживается")
+  fi
+  
+  if [[ "${results["http2_supported"]}" == true ]]; then
+    positives+=("HTTP/2 поддерживается")
+  else
+    reasons+=("HTTP/2 не поддерживается")
+  fi
+  
+  if [[ "${results["cdn_used"]}" == true ]]; then
+    cdn_list=${results["cdns"]%, }
+    reasons+=("Используется CDN: $cdn_list")
+  else
+    positives+=("CDN не используется")
+  fi
+  
+  if [[ "${results["redirect_found"]}" == false ]]; then
+    positives+=("Редиректов не найдено")
+  else
+    reasons+=("Найден редирект")
+  fi
+  
+  if [[ -n "${results["ping"]}" ]]; then
+    if [[ "${results["rating"]}" -ge 4 ]]; then
+      positives+=("Средний пинг: ${results["ping"]} ms (Рейтинг: ${results["rating"]}/5)")
+    else
+      reasons+=("Высокий пинг: ${results["ping"]} ms (Рейтинг: ${results["rating"]}/5)")
+    fi
+  else
+    reasons+=("Не удалось определить средний пинг")
+  fi
+  
+  acceptable=false
+  if [[ "${results["rating"]}" -ge 4 ]]; then
+    if [[ ${#reasons[@]} -eq 0 ]]; then
+      acceptable=true
+    elif [[ ${#reasons[@]} -eq 1 && "${reasons[0]}" == "Используется CDN: ${results["cdn_provider"]}" ]]; then
+      acceptable=true
+    else
+      acceptable=false
+    fi
+  else
+    acceptable=false
+  fi
+  
+  if [[ "$acceptable" == true ]]; then
+    echo -e "${BOLD}${GREEN}Сайт подходит для DEST for Reality по следующим причинам:${RESET}"
+    for pos in "${positives[@]}"; do
+      echo -e "${GREEN}- $pos${RESET}"
+    done
+  else
+    echo -e "${BOLD}${RED}Сайт НЕ подходит для DEST for Reality по следующим причинам:${RESET}"
+    for reason in "${reasons[@]}"; do
+      echo -e "${YELLOW}- $reason${RESET}"
+    done
+    if [[ ${#positives[@]} -gt 0 ]]; then
+      echo -e "\n${BOLD}${GREEN}Положительные моменты:${RESET}"
+      for pos in "${positives[@]}"; do
+        echo -e "${GREEN}- $pos${RESET}"
+      done
+    fi
+  fi
+  
+  port_display=${results["port"]}
+  if [[ -z "$port_display" ]]; then
+    port_display="443/80"
+  fi
+  
+  if [[ "$acceptable" == true ]]; then
+    echo -e "\n${BOLD}${GREEN}Хост ${results["domain"]}:$port_display подходит в качестве dest${RESET}"
+  else
+    echo -e "\n${BOLD}${RED}Хост ${results["domain"]}:$port_display НЕ подходит в качестве dest${RESET}"
+  fi
+}
+
+# Основная функция
+main() {
+  if [[ $# -ne 1 ]]; then
+    echo -e "${RED}Использование: $0 <домен[:порт]>${RESET}"
+    exit 1
+  fi
+  
+  input=$1
+  
+  if [[ "$input" == *:* ]]; then
+    domain=$(echo "$input" | cut -d':' -f1)
+    port=$(echo "$input" | cut -d':' -f2)
+  else
+    domain="$input"
+    port=""
+  fi
+  
+  results["domain"]="$domain"
+  results["port"]="$port"
+  
+  echo -e "\n${BOLD}${CYAN}Проверка хоста:${RESET} $domain"
+  if [[ -n "$port" ]]; then
+    echo -e "${BOLD}${CYAN}Порт:${RESET} $port"
+    ports_to_check=("$port")
+  else
+    echo -e "${BOLD}${CYAN}Стандартные порты:${RESET} 443, 80"
+    ports_to_check=(443 80)
+  fi
+  
+  # Проверка доступности портов
+  for p in "${ports_to_check[@]}"; do
+    if check_port_availability "$domain" "$p"; then
+      results["port"]="$p"
+      echo -e "${GREEN}Порт $p доступен. Продолжаем проверку...${RESET}"
+      break
+    else
+      echo -e "${YELLOW}Порт $p недоступен. Пробуем следующий порт...${RESET}"
+    fi
+  done
+  
+  if [[ -z "${results["port"]}" ]]; then
+    echo -e "${RED}Хост $domain недоступен на портах ${ports_to_check[*]}${RESET}"
+    exit 1
+  fi
+  
+  # Параллельные проверки
+  # Используем фоновые процессы и ждем их завершения
+  check_tls "$domain" "${results["port"]}" &
+  pid_tls=$!
+  
+  check_http2 "$domain" "${results["port"]}" &
+  pid_http2=$!
+  
+  check_cdn "$domain" "${results["port"]}" &
+  pid_cdn=$!
+  
+  check_redirect "$domain" "${results["port"]}" &
+  pid_redirect=$!
+  
+  calculate_ping "$domain" &
+  pid_ping=$!
+  
+  # Ожидание завершения всех проверок
+  wait $pid_tls
+  wait $pid_http2
+  wait $pid_cdn
+  wait $pid_redirect
+  wait $pid_ping
+  
+  # Отображение результатов
+  display_results
+}
+
+# Запуск основной функции
+main "$@"
