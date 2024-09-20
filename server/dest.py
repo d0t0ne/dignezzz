@@ -184,13 +184,13 @@ def calculate_ping(domain, progress, task_id):
                     results["ping"] = float(avg_ping)
                     break
             if results["ping"] is not None:
-                if results["ping"] < 50:
+                if results["ping"] < 2:
                     results["rating"] = 5
-                elif results["ping"] < 100:
+                elif results["ping"] < 3:
                     results["rating"] = 4
-                elif results["ping"] < 200:
+                elif results["ping"] < 5:
                     results["rating"] = 3
-                elif results["ping"] < 300:
+                elif results["ping"] < 8:
                     results["rating"] = 2
                 else:
                     results["rating"] = 1
