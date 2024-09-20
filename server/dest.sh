@@ -11,12 +11,13 @@ check_and_install_command() {
   local pkg=$2
   if ! command -v "$cmd" &> /dev/null; then
     echo -e "\e[33mУтилита $cmd не найдена. Устанавливаем...\e[0m"
-    sudo apt-get update
-    sudo apt-get install -y "$pkg"
+    sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" >/dev/null 2>&1
     if ! command -v "$cmd" &> /dev/null; then
       echo -e "\e[31mОшибка: не удалось установить $cmd. Пожалуйста, установите вручную.\e[0m"
       exit 1
     fi
+    echo -e "\e[32mУтилита $cmd успешно установлена.\e[0m"
   fi
 }
 
@@ -26,7 +27,7 @@ check_and_install_command "curl" "curl"
 check_and_install_command "dig" "dnsutils"
 check_and_install_command "whois" "whois"
 check_and_install_command "ping" "iputils-ping"
-check_and_install_command "nc" "netcat"
+check_and_install_command "nc" "netcat-openbsd"  # Используем конкретный пакет для netcat
 
 # Цветовые коды
 GREEN="\e[32m"
@@ -149,7 +150,7 @@ check_redirect() {
   local port=$2
   echo -ne "${CYAN}Проверка редиректов...\e[0m\r"
   redirect=$(curl -s -o /dev/null -w "%{redirect_url}" -L "https://$domain:$port" 2>/dev/null)
-  if [[ -n "$redirect" ]]; then
+  if [[ -n "$redirect" && "$redirect" != "null" ]]; then
     results["redirect_found"]=true
     results["negatives"]+="- Найден редирект: $redirect\n"
     echo -e "${YELLOW}Найден редирект: $redirect\e[0m"
@@ -168,20 +169,17 @@ calculate_ping() {
     avg_ping=$(echo "$ping_output" | grep -i "rtt" | awk -F '/' '{print $5}')
     if [[ -n "$avg_ping" ]]; then
       results["ping"]="$avg_ping"
-      # Оценка рейтинга
-      if (( $(echo "$avg_ping <= 2" | bc -l) )); then
-        results["rating"]=5
-      elif (( $(echo "$avg_ping <= 3" | bc -l) )); then
-        results["rating"]=4
-      elif (( $(echo "$avg_ping <= 5" | bc -l) )); then
-        results["rating"]=3
-      elif (( $(echo "$avg_ping <= 8" | bc -l) )); then
-        results["rating"]=2
-      else
-        results["rating"]=1
-      fi
+      # Оценка рейтинга с использованием awk
+      rating=$(awk -v avg="$avg_ping" 'BEGIN {
+        if (avg <= 2) print 5;
+        else if (avg <= 3) print 4;
+        else if (avg <= 5) print 3;
+        else if (avg <= 8) print 2;
+        else print 1;
+      }')
+      results["rating"]="$rating"
       
-      if [[ ${results["rating"]} -ge 4 ]]; then
+      if [[ "${results["rating"]}" -ge 4 ]]; then
         results["positives"]+="- Средний пинг: ${avg_ping} ms (Рейтинг: ${results["rating"]}/5)\n"
         echo -e "${GREEN}Средний пинг: ${avg_ping} ms (Рейтинг: ${results["rating"]}/5)\e[0m"
       else
