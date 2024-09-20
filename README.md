@@ -16,6 +16,7 @@
 | Script Name | Command |
 |-------------|---------|
 | sysctl_opt.sh | `bash <(wget -qO- https://dignezzz.github.io/server/sysctl_opt.sh)` |
+| reality.sh | `bash <(wget -qO- https://dignezzz.github.io/server/reality.sh)` |
 | stpush.sh | `bash <(wget -qO- https://dignezzz.github.io/server/stpush.sh)` |
 | ufw-copy.sh | `bash <(wget -qO- https://dignezzz.github.io/server/ufw-copy.sh)` |
 | sni.sh | `bash <(wget -qO- https://dignezzz.github.io/server/sni.sh)` |
