@@ -64,7 +64,7 @@ function check_http_version() {
   if [ "$HTTP2_SUPPORTED" != "true" ]; then
     # Использование openssl для проверки ALPN протоколов
     alpn_protocols=$(echo | timeout 5 openssl s_client -alpn h2 -connect $DOMAIN:443 2>/dev/null | grep "ALPN protocol")
-    if echo "$alpn_protocols" | grep -q "h2"; then
+    if echo "$alpn_protocols" | grep -q "protocols:.*h2"; then
       echo -e "${GREEN}HTTP/2 поддерживается (через openssl)${RESET}"
       HTTP2_SUPPORTED=true
     else
@@ -74,7 +74,7 @@ function check_http_version() {
     # Использование nghttp
     if command -v nghttp &> /dev/null; then
       nghttp_output=$(timeout 5 nghttp -nv https://$DOMAIN 2>&1)
-      if echo "$nghttp_output" | grep -q "HTTP/2"; then
+      if echo "$nghttp_output" | grep -q "The negotiated protocol: h2"; then
         echo -e "${GREEN}HTTP/2 поддерживается (через nghttp)${RESET}"
         HTTP2_SUPPORTED=true
       else
@@ -84,7 +84,7 @@ function check_http_version() {
       sudo apt-get install -y nghttp2-client > /dev/null 2>&1
       if command -v nghttp &> /dev/null; then
         nghttp_output=$(timeout 5 nghttp -nv https://$DOMAIN 2>&1)
-        if echo "$nghttp_output" | grep -q "HTTP/2"; then
+        if echo "$nghttp_output" | grep -q "The negotiated protocol: h2"; then
           echo -e "${GREEN}HTTP/2 поддерживается (через nghttp)${RESET}"
           HTTP2_SUPPORTED=true
         else
@@ -100,7 +100,7 @@ function check_http_version() {
 
   # Метод 1: Использование openssl для проверки ALPN протоколов
   alpn_protocols=$(echo | timeout 5 openssl s_client -alpn h3 -connect $DOMAIN:443 2>/dev/null | grep "ALPN protocol")
-  if echo "$alpn_protocols" | grep -iq "h3"; then
+  if echo "$alpn_protocols" | grep -iq "protocols:.*h3"; then
     echo -e "${GREEN}HTTP/3 поддерживается (через openssl)${RESET}"
     HTTP3_SUPPORTED=true
   else
@@ -127,6 +127,7 @@ function check_http_version() {
     HTTP_RESULT=false
   fi
 }
+
 
 # Проверка переадресации
 function check_redirect() {
