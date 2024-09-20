@@ -1,5 +1,5 @@
 #!/bin/bash
-
+clear
 # Проверяем наличие Python 3
 if ! command -v python3 &> /dev/null; then
     # Определяем систему пакетного менеджера и устанавливаем Python 3
