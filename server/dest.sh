@@ -76,13 +76,13 @@ function calculate_average_ping() {
 # Функция для определения рейтинга
 function determine_rating() {
   if [ "$PING_RESULT" = true ]; then
-    if (( $(echo "$avg_ping < 50" | bc -l) )); then
+    if (( $(echo "$avg_ping < 2" | bc -l) )); then
       RATING=5
-    elif (( $(echo "$avg_ping >= 50 && $avg_ping < 100" | bc -l) )); then
+    elif (( $(echo "$avg_ping >= 2 && $avg_ping < 3" | bc -l) )); then
       RATING=4
-    elif (( $(echo "$avg_ping >= 100 && $avg_ping < 200" | bc -l) )); then
+    elif (( $(echo "$avg_ping >= 3 && $avg_ping < 5" | bc -l) )); then
       RATING=3
-    elif (( $(echo "$avg_ping >= 200 && $avg_ping < 300" | bc -l) )); then
+    elif (( $(echo "$avg_ping >= 5 && $avg_ping < 8" | bc -l) )); then
       RATING=2
     else
       RATING=1
