@@ -1,358 +1,266 @@
 #!/bin/bash
 
-# Проверка, что скрипт запущен с правами суперпользователя для установки пакетов
-if [[ "$EUID" -ne 0 ]]; then
-  echo -e "\e[33mУтилиты могут потребовать установки. Пожалуйста, запустите скрипт с правами sudo.\e[0m"
-fi
+# Цвета для подсветки текста
+GREEN="\033[32m"
+YELLOW="\033[33m"
+RED="\033[31m"
+CYAN="\033[36m"
+RESET="\033[0m"
 
-# Функция для проверки и установки необходимых команд
-check_and_install_command() {
-  local cmd=$1
-  local pkg=$2
-  if ! command -v "$cmd" &> /dev/null; then
-    echo -e "\e[33mУтилита $cmd не найдена. Устанавливаем...\e[0m"
-    sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq
-    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" >/dev/null 2>&1
-    if ! command -v "$cmd" &> /dev/null; then
-      echo -e "\e[31mОшибка: не удалось установить $cmd. Пожалуйста, установите вручную.\e[0m"
+PING_RESULT=false
+TLS_RESULT=false
+CDN_RESULT=false
+
+# Функция для проверки и установки утилиты
+function check_and_install_command() {
+  if ! command -v $1 &> /dev/null; then
+    echo -e "${YELLOW}Утилита $1 не найдена. Устанавливаю...${RESET}"
+    sudo apt-get install -y $1 > /dev/null 2>&1
+    if ! command -v $1 &> /dev/null; then
+      echo -e "${RED}Ошибка: не удалось установить $1. Установите её вручную.${RESET}"
       exit 1
     fi
-    echo -e "\e[32mУтилита $cmd успешно установлена.\e[0m"
   fi
 }
 
-# Проверка и установка необходимых утилит
-check_and_install_command "openssl" "openssl"
-check_and_install_command "curl" "curl"
-check_and_install_command "dig" "dnsutils"
-check_and_install_command "whois" "whois"
-check_and_install_command "ping" "iputils-ping"
-check_and_install_command "nc" "netcat-openbsd"  # Используем конкретный пакет для netcat
-
-# Цветовые коды
-GREEN="\e[32m"
-YELLOW="\e[33m"
-RED="\e[31m"
-CYAN="\e[36m"
-BOLD="\e[1m"
-RESET="\e[0m"
-
-# Инициализация результатов
-declare -A results
-results=(
-  ["domain"]=""
-  ["port"]=""
-  ["tls_supported"]=false
-  ["http2_supported"]=false
-  ["cdn_used"]=false
-  ["redirect_found"]=false
-  ["ping"]=""
-  ["rating"]=0
-  ["cdn_provider"]=""
-  ["cdns"]=""
-  ["negatives"]=""
-  ["positives"]=""
-)
-
-# Функция для проверки доступности порта
-check_port_availability() {
-  local domain=$1
-  local port=$2
-  timeout 5 bash -c "echo > /dev/tcp/$domain/$port" 2>/dev/null
-  return $?
+# Функция для проверки доступности хоста и порта
+function check_host_port() {
+  echo -e "${CYAN}Проверка доступности $HOSTNAME на порту $PORT...${RESET}"
+  timeout 5 bash -c "</dev/tcp/$HOSTNAME/$PORT" &>/dev/null
+  if [ $? -eq 0 ]; then
+    echo -e "${GREEN}Хост $HOSTNAME:$PORT доступен${RESET}"
+    HOST_PORT_AVAILABLE=true
+  else
+    echo -e "${YELLOW}Хост $HOSTNAME:$PORT недоступен${RESET}"
+    HOST_PORT_AVAILABLE=false
+  fi
 }
 
 # Функция для проверки поддержки TLS 1.3
-check_tls() {
-  local domain=$1
-  local port=$2
-  echo -ne "${CYAN}Проверка поддержки TLS 1.3...\e[0m\r"
-  output=$(echo | openssl s_client -connect "$domain:$port" -tls1_3 2>&1)
-  if echo "$output" | grep -q "TLSv1.3"; then
-    results["tls_supported"]=true
-    results["positives"]+="- TLS 1.3 поддерживается\n"
-    echo -e "${GREEN}TLS 1.3 поддерживается\e[0m"
-  else
-    tls_version=$(echo "$output" | grep -i "Protocol" | awk -F: '{print $2}' | tr -d ' ')
-    if [[ -n "$tls_version" ]]; then
-      results["negatives"]+="- TLS 1.3 не поддерживается (используется $tls_version)\n"
-      echo -e "${YELLOW}TLS 1.3 не поддерживается ($tls_version)\e[0m"
+function check_tls() {
+  if [ "$PORT" == "443" ]; then
+    echo -e "${CYAN}Проверка поддержки TLS для $HOSTNAME:$PORT...${RESET}"
+    tls_version=$(echo | timeout 5 openssl s_client -connect $HOSTNAME:$PORT -tls1_3 2>/dev/null | grep "TLSv1.3")
+    if [[ -n $tls_version ]]; then
+      echo -e "${GREEN}TLS 1.3 поддерживается${RESET}"
+      TLS_RESULT=true
     else
-      results["negatives"]+="- Не удалось определить версию TLS\n"
-      echo -e "${RED}Не удалось определить версию TLS\e[0m"
-    fi
-  fi
-}
-
-# Функция для проверки поддержки HTTP/2
-check_http2() {
-  local domain=$1
-  local port=$2
-  echo -ne "${CYAN}Проверка поддержки HTTP/2...\e[0m\r"
-  http2_output=$(curl -I -s --http2 "https://$domain:$port" 2>&1)
-  if echo "$http2_output" | grep -qi "HTTP/2"; then
-    results["http2_supported"]=true
-    results["positives"]+="- HTTP/2 поддерживается\n"
-    echo -e "${GREEN}HTTP/2 поддерживается\e[0m"
-  else
-    http_version=$(curl -I -s "https://$domain:$port" 2>/dev/null | grep -i "HTTP/" | awk '{print $1}')
-    if [[ -n "$http_version" ]]; then
-      results["negatives"]+="- HTTP/2 не поддерживается (используется $http_version)\n"
-      echo -e "${YELLOW}HTTP/2 не поддерживается ($http_version)\e[0m"
-    else
-      results["negatives"]+="- Не удалось определить версию HTTP\n"
-      echo -e "${RED}Не удалось определить версию HTTP\e[0m"
-    fi
-  fi
-}
-
-# Функция для проверки использования CDN
-check_cdn() {
-  local domain=$1
-  local port=$2
-  echo -ne "${CYAN}Проверка использования CDN...\e[0m\r"
-  declare -A cdn_providers=(
-    ["cloudflare"]="Cloudflare"
-    ["akamai"]="Akamai"
-    ["fastly"]="Fastly"
-    ["incapsula"]="Imperva Incapsula"
-    ["sucuri"]="Sucuri"
-    ["stackpath"]="StackPath"
-    ["cdn77"]="CDN77"
-    ["edgecast"]="Verizon Edgecast"
-    ["keycdn"]="KeyCDN"
-    ["azure"]="Microsoft Azure CDN"
-    ["aliyun"]="Alibaba Cloud CDN"
-    ["baidu"]="Baidu Cloud CDN"
-    ["tencent"]="Tencent Cloud CDN"
-  )
-  
-  headers=$(curl -I -s "https://$domain:$port" 2>/dev/null)
-  header_str=$(echo "$headers" | tr '[:upper:]' '[:lower:]')
-  
-  for key in "${!cdn_providers[@]}"; do
-    if echo "$header_str" | grep -q "$key"; then
-      results["cdn_used"]=true
-      results["cdn_provider"]="${cdn_providers[$key]}"
-      results["cdns"]+="${cdn_providers[$key]}, "
-      echo -e "${YELLOW}Используется CDN: ${cdn_providers[$key]}\e[0m"
-      return
-    fi
-  done
-  
-  results["positives"]+="- CDN не используется\n"
-  echo -e "${GREEN}CDN не используется\e[0m"
-}
-
-# Функция для проверки редиректов
-check_redirect() {
-  local domain=$1
-  local port=$2
-  echo -ne "${CYAN}Проверка редиректов...\e[0m\r"
-  redirect=$(curl -s -o /dev/null -w "%{redirect_url}" -L "https://$domain:$port" 2>/dev/null)
-  if [[ -n "$redirect" && "$redirect" != "null" ]]; then
-    results["redirect_found"]=true
-    results["negatives"]+="- Найден редирект: $redirect\n"
-    echo -e "${YELLOW}Найден редирект: $redirect\e[0m"
-  else
-    results["positives"]+="- Редиректов не найдено\n"
-    echo -e "${GREEN}Редиректов не найдено\e[0m"
-  fi
-}
-
-# Функция для расчета пинга
-calculate_ping() {
-  local domain=$1
-  echo -ne "${CYAN}Расчет пинга...\e[0m\r"
-  ping_output=$(ping -c 5 "$domain" 2>/dev/null)
-  if [[ $? -eq 0 ]]; then
-    avg_ping=$(echo "$ping_output" | grep -i "rtt" | awk -F '/' '{print $5}')
-    if [[ -n "$avg_ping" ]]; then
-      results["ping"]="$avg_ping"
-      # Оценка рейтинга с использованием awk
-      rating=$(awk -v avg="$avg_ping" 'BEGIN {
-        if (avg <= 2) print 5;
-        else if (avg <= 3) print 4;
-        else if (avg <= 5) print 3;
-        else if (avg <= 8) print 2;
-        else print 1;
-      }')
-      results["rating"]="$rating"
-      
-      if [[ "${results["rating"]}" -ge 4 ]]; then
-        results["positives"]+="- Средний пинг: ${avg_ping} ms (Рейтинг: ${results["rating"]}/5)\n"
-        echo -e "${GREEN}Средний пинг: ${avg_ping} ms (Рейтинг: ${results["rating"]}/5)\e[0m"
+      tls_version=$(echo | timeout 5 openssl s_client -connect $HOSTNAME:$PORT 2>/dev/null | grep "Protocol" | awk '{print $2}')
+      if [ -n "$tls_version" ]; then
+        echo -e "${YELLOW}TLS 1.3 не поддерживается. Используемая версия: ${tls_version}${RESET}"
       else
-        results["negatives"]+="- Высокий пинг: ${avg_ping} ms (Рейтинг: ${results["rating"]}/5)\n"
-        echo -e "${YELLOW}Высокий пинг: ${avg_ping} ms (Рейтинг: ${results["rating"]}/5)\e[0m"
+        echo -e "${RED}Не удалось определить используемую версию TLS${RESET}"
       fi
-    else
-      results["negatives"]+="- Не удалось определить средний пинг\n"
-      echo -e "${RED}Не удалось определить средний пинг\e[0m"
+      TLS_RESULT=false
     fi
   else
-    results["negatives"]+="- Не удалось выполнить пинг хоста\n"
-    echo -e "${RED}Не удалось выполнить пинг хоста\e[0m"
+    TLS_RESULT=true  # Предполагаем, что TLS не требуется на других портах
   fi
 }
 
-# Функция для отображения результатов
-display_results() {
-  echo -e "\n${BOLD}${CYAN}===== Результаты проверки =====${RESET}\n"
-  
-  reasons=()
-  positives=()
-  
-  if [[ "${results["tls_supported"]}" == true ]]; then
-    positives+=("TLS 1.3 поддерживается")
+# Функция для вычисления среднего пинга
+function calculate_average_ping() {
+  echo -e "${CYAN}Вычисление среднего пинга до $HOSTNAME...${RESET}"
+  ping_output=$(ping -c 5 -q $HOSTNAME)
+  if [ $? -ne 0 ]; then
+    echo -e "${RED}Не удалось выполнить пинг до $HOSTNAME${RESET}"
+    PING_RESULT=false
+    avg_ping=1000  # Устанавливаем высокое значение пинга
   else
-    reasons+=("TLS 1.3 не поддерживается")
+    avg_ping=$(echo "$ping_output" | grep "rtt" | awk -F '/' '{print $5}')
+    echo -e "${GREEN}Средний пинг: ${avg_ping} мс${RESET}"
+    PING_RESULT=true
   fi
-  
-  if [[ "${results["http2_supported"]}" == true ]]; then
-    positives+=("HTTP/2 поддерживается")
+}
+
+# Функция для определения рейтинга
+function determine_rating() {
+  if [ "$PING_RESULT" = true ]; then
+    if (( $(echo "$avg_ping < 50" | bc -l) )); then
+      RATING=5
+    elif (( $(echo "$avg_ping >= 50 && $avg_ping < 100" | bc -l) )); then
+      RATING=4
+    elif (( $(echo "$avg_ping >= 100 && $avg_ping < 200" | bc -l) )); then
+      RATING=3
+    elif (( $(echo "$avg_ping >= 200 && $avg_ping < 300" | bc -l) )); then
+      RATING=2
+    else
+      RATING=1
+    fi
+    echo -e "${CYAN}Рейтинг на основе пинга: ${RATING}/5${RESET}"
   else
-    reasons+=("HTTP/2 не поддерживается")
+    echo -e "${YELLOW}Не удалось определить пинг, рейтинг устанавливается на 0${RESET}"
+    RATING=0
   fi
-  
-  if [[ "${results["cdn_used"]}" == true ]]; then
-    cdn_list=${results["cdns"]%, }
-    reasons+=("Используется CDN: $cdn_list")
+}
+
+# Функция для анализа HTTP-заголовков на наличие CDN
+function check_cdn_headers() {
+  echo -e "${CYAN}Анализ HTTP-заголовков для определения CDN...${RESET}"
+  URL="$PROTOCOL://$HOSTNAME:$PORT"
+  headers=$(curl -s -I --max-time 5 "$URL")
+
+  if echo "$headers" | grep -iq "cloudflare"; then
+    echo -e "${YELLOW}Используется CDN: Cloudflare (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "akamai"; then
+    echo -e "${YELLOW}Используется CDN: Akamai (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  # Добавьте дополнительные проверки для других CDN
   else
+    echo -e "${GREEN}По заголовкам CDN не обнаружен${RESET}"
+  fi
+}
+
+# Функция для анализа SSL-сертификата на наличие CDN
+function check_cdn_certificate() {
+  if [ "$PROTOCOL" == "https" ]; then
+    echo -e "${CYAN}Анализ SSL-сертификата для определения CDN...${RESET}"
+    cert_info=$(echo | timeout 5 openssl s_client -connect $HOSTNAME:$PORT 2>/dev/null | openssl x509 -noout -issuer -subject)
+    
+    if echo "$cert_info" | grep -iq "Cloudflare"; then
+      echo -e "${YELLOW}Используется CDN: Cloudflare (по SSL-сертификату)${RESET}"
+      CDN_RESULT=true
+    elif echo "$cert_info" | grep -iq "Akamai"; then
+      echo -e "${YELLOW}Используется CDN: Akamai (по SSL-сертификату)${RESET}"
+      CDN_RESULT=true
+    # Добавьте дополнительные проверки для других CDN
+    else
+      echo -e "${GREEN}CDN не обнаружен по SSL-сертификату${RESET}"
+    fi
+  else
+    echo -e "${YELLOW}Протокол HTTP не использует SSL-сертификаты. Пропускаем проверку сертификата.${RESET}"
+  fi
+}
+
+# Объединенная функция проверки CDN
+function check_cdn() {
+  CDN_RESULT=false
+  check_and_install_command curl
+  check_cdn_headers
+  if [ "$CDN_RESULT" == "true" ]; then return; fi
+
+  check_cdn_certificate
+  if [ "$CDN_RESULT" == "true" ]; then return; fi
+
+  echo -e "${GREEN}CDN не используется${RESET}"
+}
+
+# Функция для вывода результатов проверки с измененной логикой
+function check_dest_for_reality() {
+  local reasons=()
+  local negatives=()
+  local positives=()
+
+  # Проверка рейтинга по пингу
+  if [ "$PING_RESULT" = true ]; then
+    if [ $RATING -ge 3 ]; then
+      positives+=("Рейтинг по пингу: ${RATING}/5")
+    else
+      negatives+=("Рейтинг по пингу ниже 3 (${RATING}/5)")
+    fi
+  else
+    negatives+=("Не удалось выполнить пинг до хоста")
+  fi
+
+  # Проверка TLS 1.3
+  if [ "$TLS_RESULT" = true ]; then
+    positives+=("Поддерживается TLS 1.3")
+  else
+    negatives+=("Не поддерживается TLS 1.3")
+  fi
+
+  # Проверка CDN
+  if [ "$CDN_RESULT" = false ]; then
     positives+=("CDN не используется")
-  fi
-  
-  if [[ "${results["redirect_found"]}" == false ]]; then
-    positives+=("Редиректов не найдено")
   else
-    reasons+=("Найден редирект")
+    negatives+=("Использование CDN")
   fi
-  
-  if [[ -n "${results["ping"]}" ]]; then
-    if [[ "${results["rating"]}" -ge 4 ]]; then
-      positives+=("Средний пинг: ${results["ping"]} ms (Рейтинг: ${results["rating"]}/5)")
-    else
-      reasons+=("Высокий пинг: ${results["ping"]} ms (Рейтинг: ${results["rating"]}/5)")
-    fi
-  else
-    reasons+=("Не удалось определить средний пинг")
-  fi
-  
-  acceptable=false
-  if [[ "${results["rating"]}" -ge 4 ]]; then
-    if [[ ${#reasons[@]} -eq 0 ]]; then
-      acceptable=true
-    elif [[ ${#reasons[@]} -eq 1 && "${reasons[0]}" == "Используется CDN: ${results["cdn_provider"]}" ]]; then
-      acceptable=true
-    else
-      acceptable=false
-    fi
-  else
-    acceptable=false
-  fi
-  
-  if [[ "$acceptable" == true ]]; then
-    echo -e "${BOLD}${GREEN}Сайт подходит для DEST for Reality по следующим причинам:${RESET}"
-    for pos in "${positives[@]}"; do
-      echo -e "${GREEN}- $pos${RESET}"
+
+  echo -e "\n${CYAN}===== Результаты проверки =====${RESET}"
+
+  if [ ${#negatives[@]} -eq 0 ]; then
+    echo -e "${GREEN}Сайт подходит как dest для Reality по следующим причинам:${RESET}"
+    for positive in "${positives[@]}"; do
+      echo -e "${GREEN}- $positive${RESET}"
     done
   else
-    echo -e "${BOLD}${RED}Сайт НЕ подходит для DEST for Reality по следующим причинам:${RESET}"
-    for reason in "${reasons[@]}"; do
-      echo -e "${YELLOW}- $reason${RESET}"
-    done
-    if [[ ${#positives[@]} -gt 0 ]]; then
-      echo -e "\n${BOLD}${GREEN}Положительные моменты:${RESET}"
-      for pos in "${positives[@]}"; do
-        echo -e "${GREEN}- $pos${RESET}"
+    # Проверяем, является ли единственным отрицательным моментом использование CDN
+    if [ ${#negatives[@]} -eq 1 ] && [ "${negatives[0]}" == "Использование CDN" ]; then
+      echo -e "${YELLOW}Сайт не рекомендуется по следующим причинам:${RESET}"
+      for negative in "${negatives[@]}"; do
+        echo -e "${YELLOW}- $negative${RESET}"
+      done
+    else
+      echo -e "${RED}Сайт НЕ ПОДХОДИТ по следующим причинам:${RESET}"
+      for negative in "${negatives[@]}"; do
+        echo -e "${YELLOW}- $negative${RESET}"
+      done
+    fi
+
+    if [ ${#positives[@]} -gt 0 ]; then
+      echo -e "\n${GREEN}Положительные моменты:${RESET}"
+      for positive in "${positives[@]}"; do
+        echo -e "${GREEN}- $positive${RESET}"
       done
     fi
   fi
-  
-  port_display=${results["port"]}
-  if [[ -z "$port_display" ]]; then
-    port_display="443/80"
-  fi
-  
-  if [[ "$acceptable" == true ]]; then
-    echo -e "\n${BOLD}${GREEN}Хост ${results["domain"]}:$port_display подходит в качестве dest${RESET}"
-  else
-    echo -e "\n${BOLD}${RED}Хост ${results["domain"]}:$port_display НЕ подходит в качестве dest${RESET}"
-  fi
 }
 
-# Основная функция
-main() {
-  if [[ $# -ne 1 ]]; then
-    echo -e "${RED}Использование: $0 <домен[:порт]>${RESET}"
-    exit 1
-  fi
-  
-  input=$1
-  
-  if [[ "$input" == *:* ]]; then
-    domain=$(echo "$input" | cut -d':' -f1)
-    port=$(echo "$input" | cut -d':' -f2)
-  else
-    domain="$input"
-    port=""
-  fi
-  
-  results["domain"]="$domain"
-  results["port"]="$port"
-  
-  echo -e "\n${BOLD}${CYAN}Проверка хоста:${RESET} $domain"
-  if [[ -n "$port" ]]; then
-    echo -e "${BOLD}${CYAN}Порт:${RESET} $port"
-    ports_to_check=("$port")
-  else
-    echo -e "${BOLD}${CYAN}Стандартные порты:${RESET} 443, 80"
-    ports_to_check=(443 80)
-  fi
-  
-  # Проверка доступности портов
-  for p in "${ports_to_check[@]}"; do
-    if check_port_availability "$domain" "$p"; then
-      results["port"]="$p"
-      echo -e "${GREEN}Порт $p доступен. Продолжаем проверку...${RESET}"
-      break
-    else
-      echo -e "${YELLOW}Порт $p недоступен. Пробуем следующий порт...${RESET}"
-    fi
-  done
-  
-  if [[ -z "${results["port"]}" ]]; then
-    echo -e "${RED}Хост $domain недоступен на портах ${ports_to_check[*]}${RESET}"
-    exit 1
-  fi
-  
-  # Параллельные проверки
-  # Используем фоновые процессы и ждем их завершения
-  check_tls "$domain" "${results["port"]}" &
-  pid_tls=$!
-  
-  check_http2 "$domain" "${results["port"]}" &
-  pid_http2=$!
-  
-  check_cdn "$domain" "${results["port"]}" &
-  pid_cdn=$!
-  
-  check_redirect "$domain" "${results["port"]}" &
-  pid_redirect=$!
-  
-  calculate_ping "$domain" &
-  pid_ping=$!
-  
-  # Ожидание завершения всех проверок
-  wait $pid_tls
-  wait $pid_http2
-  wait $pid_cdn
-  wait $pid_redirect
-  wait $pid_ping
-  
-  # Отображение результатов
-  display_results
-}
+# Проверка, введен ли хост
+if [ -z "$1" ]; then
+  echo -e "${RED}Использование: $0 <хост[:порт]>${RESET}"
+  exit 1
+fi
 
-# Запуск основной функции
-main "$@"
+# Разбор хоста и порта
+INPUT="$1"
+if [[ $INPUT == *":"* ]]; then
+  HOSTNAME=$(echo $INPUT | cut -d':' -f1)
+  PORT=$(echo $INPUT | cut -d':' -f2)
+else
+  HOSTNAME="$INPUT"
+  PORT=""
+fi
+
+# Если порт не указан, попробуем стандартные порты
+if [ -z "$PORT" ]; then
+  PORTS=(443 80)
+else
+  PORTS=($PORT)
+fi
+
+# Проверка необходимых утилит и установка при необходимости
+check_and_install_command openssl
+check_and_install_command ping
+check_and_install_command bc
+
+# Флаг для определения доступности хоста на каком-либо порту
+HOST_AVAILABLE=false
+
+# Попытка подключиться по разным портам
+for PORT in "${PORTS[@]}"; do
+  # Определяем протокол
+  if [ "$PORT" == "443" ]; then
+    PROTOCOL="https"
+  else
+    PROTOCOL="http"
+  fi
+
+  check_host_port
+  if [ "$HOST_PORT_AVAILABLE" = true ]; then
+    HOST_AVAILABLE=true
+    check_tls
+    check_cdn
+    break
+  fi
+done
+
+if [ "$HOST_AVAILABLE" = false ]; then
+  echo -e "${RED}Хост $HOSTNAME недоступен на портах ${PORTS[*]}${RESET}"
+  exit 1
+fi
+
+calculate_average_ping
+determine_rating
+check_dest_for_reality
