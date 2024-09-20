@@ -60,7 +60,7 @@ function check_http_version() {
   HTTP2_SUPPORTED=false
   HTTP3_SUPPORTED=false
 
-  http2_check=$(curl -I -s --max-time 5 --http2 https://$DOMAIN 2>/dev/null | grep -i "^HTTP/2")
+  http2_check=$(curl -I -s --max-time 5 --http2 https://$DOMAIN -H "User-Agent: Mozilla/5.0" 2>/dev/null | grep -i "^HTTP/2")
   if [[ -n $http2_check ]]; then
     echo -e "${GREEN}HTTP/2 is supported (via curl)${RESET}"
     HTTP2_SUPPORTED=true
@@ -141,7 +141,17 @@ function calculate_average_ping() {
     PING_RESULT=true
   fi
 }
-
+function check_redirect() {
+  echo -e "${CYAN}Checking for redirects for $DOMAIN...${RESET}"
+  redirect_check=$(curl -s -o /dev/null -w "%{redirect_url}" --max-time 5 https://$DOMAIN)
+  if [ -n "$redirect_check" ]; then
+    echo -e "${YELLOW}Redirect found: $redirect_check${RESET}"
+    REDIRECT_RESULT=true
+  else
+    echo -e "${GREEN}No redirect found${RESET}"
+    REDIRECT_RESULT=false
+  fi
+}
 function determine_rating() {
   if [ "$PING_RESULT" = true ]; then
     if (( $(echo "$avg_ping < 2" | bc -l) )); then
@@ -163,9 +173,8 @@ function determine_rating() {
 }
 
 function check_cdn_headers() {
-  echo -e "${CYAN}Analyzing HTTP headers for CDN detection...${RESET}"
-  URL="$PROTOCOL://$HOSTNAME:$PORT"
-  headers=$(curl -s -I --max-time 5 "$URL")
+  echo -e "${CYAN}Analyzing HTTP headers for CDN...${RESET}"
+  headers=$(curl -s -I --max-time 5 https://$DOMAIN)
 
   if echo "$headers" | grep -iq "cloudflare"; then
     echo -e "${YELLOW}CDN detected: Cloudflare (by headers)${RESET}"
@@ -173,34 +182,196 @@ function check_cdn_headers() {
   elif echo "$headers" | grep -iq "akamai"; then
     echo -e "${YELLOW}CDN detected: Akamai (by headers)${RESET}"
     CDN_RESULT=true
+  elif echo "$headers" | grep -iq "fastly"; then
+    echo -e "${YELLOW}CDN detected: Fastly (by headers)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "incapsula"; then
+    echo -e "${YELLOW}CDN detected: Imperva Incapsula (by headers)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "sucuri"; then
+    echo -e "${YELLOW}CDN detected: Sucuri (by headers)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "stackpath"; then
+    echo -e "${YELLOW}CDN detected: StackPath (by headers)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "cdn77"; then
+    echo -e "${YELLOW}CDN detected: CDN77 (by headers)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "edgecast"; then
+    echo -e "${YELLOW}CDN detected: Verizon Edgecast (by headers)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "keycdn"; then
+    echo -e "${YELLOW}CDN detected: KeyCDN (by headers)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "azurecdn"; then
+    echo -e "${YELLOW}CDN detected: Microsoft Azure CDN (by headers)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "cdn"; then
+    echo -e "${YELLOW}CDN detected (by headers)${RESET}"
+    CDN_RESULT=true
   else
     echo -e "${GREEN}No CDN detected by headers${RESET}"
   fi
 }
 
-function check_cdn_certificate() {
-  if [ "$PROTOCOL" == "https" ]; then
-    echo -e "${CYAN}Analyzing SSL certificate for CDN detection...${RESET}"
-    cert_info=$(echo | timeout 5 openssl s_client -connect $HOSTNAME:$PORT 2>/dev/null | openssl x509 -noout -issuer -subject)
-    
-    if echo "$cert_info" | grep -iq "Cloudflare"; then
-      echo -e "${YELLOW}CDN detected: Cloudflare (by SSL certificate)${RESET}"
-      CDN_RESULT=true
-    elif echo "$cert_info" | grep -iq "Akamai"; then
-      echo -e "${YELLOW}CDN detected: Akamai (by SSL certificate)${RESET}"
-      CDN_RESULT=true
-    else
-      echo -e "${GREEN}No CDN detected by SSL certificate${RESET}"
-    fi
+function check_cdn_asn() {
+  echo -e "${CYAN}Checking ASN for CDN...${RESET}"
+  ip=$(dig +short $DOMAIN | head -n1)
+  if [ -z "$ip" ]; then
+    echo -e "${RED}Failed to retrieve domain IP address${RESET}"
+    return
+  fi
+  asn_info=$(whois -h whois.cymru.com " -v $ip" 2>/dev/null | tail -n1)
+  asn=$(echo $asn_info | awk '{print $1}')
+  owner=$(echo $asn_info | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
+
+  if echo "$owner" | grep -iq "Cloudflare"; then
+    echo -e "${YELLOW}CDN detected: Cloudflare (by ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "Akamai"; then
+    echo -e "${YELLOW}CDN detected: Akamai (by ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "Fastly"; then
+    echo -e "${YELLOW}CDN detected: Fastly (by ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "Microsoft"; then
+    echo -e "${YELLOW}CDN detected: Microsoft Azure CDN (by ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "Incapsula"; then
+    echo -e "${YELLOW}CDN detected: Imperva Incapsula (by ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "Sucuri"; then
+    echo -e "${YELLOW}CDN detected: Sucuri (by ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "StackPath"; then
+    echo -e "${YELLOW}CDN detected: StackPath (by ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "CDN77"; then
+    echo -e "${YELLOW}CDN detected: CDN77 (by ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "Edgecast"; then
+    echo -e "${YELLOW}CDN detected: Verizon Edgecast (by ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "KeyCDN"; then
+    echo -e "${YELLOW}CDN detected: KeyCDN (by ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "Alibaba"; then
+    echo -e "${YELLOW}CDN detected: Alibaba Cloud CDN (by ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "Tencent"; then
+    echo -e "${YELLOW}CDN detected: Tencent Cloud CDN (by ASN)${RESET}"
+    CDN_RESULT=true
   else
-    echo -e "${YELLOW}HTTP protocol does not use SSL certificates. Skipping certificate check.${RESET}"
+    echo -e "${GREEN}No CDN detected by ASN${RESET}"
+  fi
+}
+
+function check_cdn_ipinfo() {
+  echo -e "${CYAN}Using ipinfo.io for CDN detection...${RESET}"
+  check_and_install_command jq
+  ip=$(dig +short $DOMAIN | head -n1)
+  if [ -z "$ip" ]; then
+    echo -e "${RED}Failed to retrieve domain IP address${RESET}"
+    return
+  fi
+  json=$(curl -s --max-time 5 https://ipinfo.io/$ip/json)
+  org=$(echo $json | jq -r '.org')
+
+  if echo "$org" | grep -iq "Cloudflare"; then
+    echo -e "${YELLOW}CDN detected: Cloudflare (via ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "Akamai"; then
+    echo -e "${YELLOW}CDN detected: Akamai (via ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "Fastly"; then
+    echo -e "${YELLOW}CDN detected: Fastly (via ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "Incapsula"; then
+    echo -e "${YELLOW}CDN detected: Imperva Incapsula (via ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "Sucuri"; then
+    echo -e "${YELLOW}CDN detected: Sucuri (via ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "Microsoft"; then
+    echo -e "${YELLOW}CDN detected: Microsoft Azure CDN (via ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "StackPath"; then
+    echo -e "${YELLOW}CDN detected: StackPath (via ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "CDN77"; then
+    echo -e "${YELLOW}CDN detected: CDN77 (via ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "Edgecast"; then
+    echo -e "${YELLOW}CDN detected: Verizon Edgecast (via ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "KeyCDN"; then
+    echo -e "${YELLOW}CDN detected: KeyCDN (via ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "Alibaba"; then
+    echo -e "${YELLOW}CDN detected: Alibaba Cloud CDN (via ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  elif echo "$org" | grep -iq "Tencent"; then
+    echo -e "${YELLOW}CDN detected: Tencent Cloud CDN (via ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  else
+    echo -e "${GREEN}No CDN detected via ipinfo.io${RESET}"
+  fi
+}
+
+function check_cdn_certificate() {
+  echo -e "${CYAN}Analyzing SSL certificate for CDN...${RESET}"
+  cert_info=$(echo | timeout 5 openssl s_client -connect $DOMAIN:443 2>/dev/null | openssl x509 -noout -issuer -subject)
+  
+  if echo "$cert_info" | grep -iq "Cloudflare"; then
+    echo -e "${YELLOW}CDN detected: Cloudflare (via SSL certificate)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "Microsoft"; then
+    echo -e "${YELLOW}CDN detected: Microsoft Azure CDN (via SSL certificate)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "Akamai"; then
+    echo -e "${YELLOW}CDN detected: Akamai (via SSL certificate)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "Fastly"; then
+    echo -e "${YELLOW}CDN detected: Fastly (via SSL certificate)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "Incapsula"; then
+    echo -e "${YELLOW}CDN detected: Imperva Incapsula (via SSL certificate)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "Sucuri"; then
+    echo -e "${YELLOW}CDN detected: Sucuri (via SSL certificate)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "StackPath"; then
+    echo -e "${YELLOW}CDN detected: StackPath (via SSL certificate)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "CDN77"; then
+    echo -e "${YELLOW}CDN detected: CDN77 (via SSL certificate)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "Edgecast"; then
+    echo -e "${YELLOW}CDN detected: Verizon Edgecast (via SSL certificate)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "KeyCDN"; then
+    echo -e "${YELLOW}CDN detected: KeyCDN (via SSL certificate)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "Alibaba"; then
+    echo -e "${YELLOW}CDN detected: Alibaba Cloud CDN (via SSL certificate)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "Tencent"; then
+    echo -e "${YELLOW}CDN detected: Tencent Cloud CDN (via SSL certificate)${RESET}"
+    CDN_RESULT=true
+  else
+    echo -e "${GREEN}No CDN detected via SSL certificate${RESET}"
   fi
 }
 
 function check_cdn() {
   CDN_RESULT=false
-  check_and_install_command curl
   check_cdn_headers
+  if [ "$CDN_RESULT" == "true" ]; then return; fi
+
+  check_cdn_asn
+  if [ "$CDN_RESULT" == "true" ]; then return; fi
+
+  check_cdn_ipinfo
   if [ "$CDN_RESULT" == "true" ]; then return; fi
 
   check_cdn_certificate
@@ -232,9 +403,13 @@ function check_dest_for_reality() {
   if [ "$HTTP_RESULT" == "true" ]; then
     positives+=("HTTP/2 is supported")
   else
-    reasons+=("HTTP/2 is not supported")
+    negatives+=("HTTP/2 is not supported")
   fi
-
+  if [ "$REDIRECT_RESULT" == "false" ]; then
+    positives+=("No redirects found")
+  else
+    reasons+=("Redirect found")
+  fi
   if [ "$CDN_RESULT" = false ]; then
     positives+=("CDN is not used")
   else
@@ -307,6 +482,7 @@ for PORT in "${PORTS[@]}"; do
   if [ "$HOST_PORT_AVAILABLE" = true ]; then
     HOST_AVAILABLE=true
     check_tls
+    check_redirect
     check_http_version
     check_cdn
     break
