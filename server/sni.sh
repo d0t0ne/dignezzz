@@ -173,6 +173,9 @@ function check_cdn_headers() {
   elif echo "$headers" | grep -iq "keycdn"; then
     echo -e "${YELLOW}Используется CDN: KeyCDN (по заголовкам)${RESET}"
     CDN_RESULT=true
+  elif echo "$headers" | grep -iq "azurecdn"; then
+    echo -e "${YELLOW}Используется CDN: Microsoft Azure CDN (по заголовкам)${RESET}"
+    CDN_RESULT=true
   elif echo "$headers" | grep -iq "cdn"; then
     echo -e "${YELLOW}Обнаружены признаки использования CDN (по заголовкам)${RESET}"
     CDN_RESULT=true
@@ -201,6 +204,9 @@ function check_cdn_asn() {
     CDN_RESULT=true
   elif echo "$owner" | grep -iq "Fastly"; then
     echo -e "${YELLOW}Используется CDN: Fastly (по ASN)${RESET}"
+    CDN_RESULT=true
+  elif echo "$owner" | grep -iq "Microsoft"; then
+    echo -e "${YELLOW}Используется CDN: Microsoft Azure CDN (по ASN)${RESET}"
     CDN_RESULT=true
   elif echo "$owner" | grep -iq "Incapsula"; then
     echo -e "${YELLOW}Используется CDN: Imperva Incapsula (по ASN)${RESET}"
@@ -258,6 +264,11 @@ function check_cdn_ipinfo() {
   elif echo "$org" | grep -iq "Sucuri"; then
     echo -e "${YELLOW}Используется CDN: Sucuri (через ipinfo.io)${RESET}"
     CDN_RESULT=true
+  
+  elif echo "$org" | grep -iq "Microsoft"; then
+    echo -e "${YELLOW}Используется CDN: Microsoft Azure CDN (через ipinfo.io)${RESET}"
+    CDN_RESULT=true
+  
   elif echo "$org" | grep -iq "StackPath"; then
     echo -e "${YELLOW}Используется CDN: StackPath (через ipinfo.io)${RESET}"
     CDN_RESULT=true
@@ -288,6 +299,9 @@ function check_cdn_certificate() {
   
   if echo "$cert_info" | grep -iq "Cloudflare"; then
     echo -e "${YELLOW}Используется CDN: Cloudflare (по SSL-сертификату)${RESET}"
+    CDN_RESULT=true
+  elif echo "$cert_info" | grep -iq "Microsoft"; then
+    echo -e "${YELLOW}Используется CDN: Microsoft Azure CDN (по SSL-сертификату)${RESET}"
     CDN_RESULT=true
   elif echo "$cert_info" | grep -iq "Akamai"; then
     echo -e "${YELLOW}Используется CDN: Akamai (по SSL-сертификату)${RESET}"
