@@ -5,11 +5,10 @@ import requests
 import json
 import time
 import threading
+import ssl
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich.table import Table
-from rich.panel import Panel
 
 console = Console()
 
@@ -27,40 +26,26 @@ results = {
     "positives": [],
 }
 
-# Функция для проверки TLS 1.3
+# Обновленная функция check_tls
 def check_tls(domain):
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.minimum_version = ssl.TLSVersion.TLSv1_3
+    context.maximum_version = ssl.TLSVersion.TLSv1_3
     try:
-        proc = subprocess.run(
-            ["openssl", "s_client", "-connect", f"{domain}:443", "-tls1_3"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=5,
-            text=True,
-        )
-        if "TLSv1.3" in proc.stderr:
-            results["tls"] = True
-            results["positives"].append("Поддерживается TLS 1.3")
-        else:
-            proc = subprocess.run(
-                ["openssl", "s_client", "-connect", f"{domain}:443"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                timeout=5,
-                text=True,
-            )
-            protocol_line = next(
-                (line for line in proc.stderr.split("\n") if "Protocol  :" in line),
-                None,
-            )
-            if protocol_line:
-                tls_version = protocol_line.split(":")[1].strip()
-                results["negatives"].append(f"Не поддерживается TLS 1.3 (используется {tls_version})")
-            else:
-                results["negatives"].append("Не удалось определить используемую версию TLS")
+        with socket.create_connection((domain, 443), timeout=5) as sock:
+            with context.wrap_socket(sock, server_hostname=domain) as ssock:
+                protocol_version = ssock.version()
+                if protocol_version == 'TLSv1.3':
+                    results["tls"] = True
+                    results["positives"].append("Поддерживается TLS 1.3")
+                else:
+                    results["negatives"].append(f"Не поддерживается TLS 1.3 (используется {protocol_version})")
+    except ssl.SSLError as e:
+        results["negatives"].append("Не поддерживается TLS 1.3")
     except Exception as e:
         results["negatives"].append(f"Ошибка при проверке TLS: {e}")
 
-# Функция для проверки HTTP/2
+# Остальные функции остаются без изменений
 def check_http2(domain):
     try:
         proc = subprocess.run(
@@ -78,7 +63,6 @@ def check_http2(domain):
     except Exception as e:
         results["negatives"].append(f"Ошибка при проверке HTTP/2: {e}")
 
-# Функция для проверки наличия CDN
 def check_cdn(domain):
     cdn_providers = {
         "cloudflare": "Cloudflare",
@@ -109,7 +93,6 @@ def check_cdn(domain):
     except Exception as e:
         results["negatives"].append(f"Ошибка при проверке CDN: {e}")
 
-# Функция для проверки переадресации
 def check_redirect(domain):
     try:
         response = requests.get(f"https://{domain}", timeout=5, allow_redirects=False)
@@ -121,7 +104,6 @@ def check_redirect(domain):
     except Exception as e:
         results["negatives"].append(f"Ошибка при проверке переадресации: {e}")
 
-# Функция для вычисления среднего пинга
 def calculate_ping(domain):
     try:
         proc = subprocess.run(
@@ -156,12 +138,11 @@ def calculate_ping(domain):
     except Exception as e:
         results["negatives"].append(f"Ошибка при вычислении пинга: {e}")
 
-# Функция для отображения результатов
 def display_results():
     console.print("\n[bold cyan]===== Результаты проверки =====[/bold cyan]\n")
     if results["negatives"]:
         # Если единственный отрицательный момент - использование CDN
-        if len(results["negatives"]) == 1 and "Использование CDN" in results["negatives"][0]:
+        if len(results["negatives"]) == 1 and any("Использование CDN" in neg for neg in results["negatives"]):
             console.print("[bold yellow]Сайт не рекомендуется по следующим причинам:[/bold yellow]")
             for negative in results["negatives"]:
                 console.print(f"[yellow]- {negative}[/yellow]")
@@ -179,22 +160,20 @@ def display_results():
         for positive in results["positives"]:
             console.print(f"[green]- {positive}[/green]")
 
-# Основная функция
 def main(domain):
     results["domain"] = domain
 
     # Создаем прогресс-бар
     with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        transient=True,
+        SpinnerColumn(finished_text="✅"),
+        TextColumn("{task.fields[status]}"),
     ) as progress:
         tasks = []
-        tasks.append(progress.add_task(description="Проверка поддержки TLS 1.3...", total=None))
-        tasks.append(progress.add_task(description="Проверка поддержки HTTP/2...", total=None))
-        tasks.append(progress.add_task(description="Проверка наличия CDN...", total=None))
-        tasks.append(progress.add_task(description="Проверка переадресации...", total=None))
-        tasks.append(progress.add_task(description="Вычисление пинга...", total=None))
+        tasks.append(progress.add_task("", status="Проверка поддержки TLS 1.3...", total=1))
+        tasks.append(progress.add_task("", status="Проверка поддержки HTTP/2...", total=1))
+        tasks.append(progress.add_task("", status="Проверка наличия CDN...", total=1))
+        tasks.append(progress.add_task("", status="Проверка переадресации...", total=1))
+        tasks.append(progress.add_task("", status="Вычисление пинга...", total=1))
 
         threads = []
 
@@ -219,7 +198,7 @@ def main(domain):
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        console.print("[bold red]Использование: python script.py <домен>[/bold red]")
+        console.print("[bold red]Использование: script.py <домен>[/bold red]")
         sys.exit(1)
     domain = sys.argv[1]
     main(domain)
