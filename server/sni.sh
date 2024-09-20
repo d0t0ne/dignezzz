@@ -95,16 +95,17 @@ choose_language() {
 install_python_and_packages() {
     print_message "update_python"
     if command -v apt-get &> /dev/null; then
-        sudo apt-get update -y
-        sudo apt-get install -y python3 python3-pip
+        sudo apt-get update -y &> /dev/null &
+        sudo apt-get install -y python3 python3-pip &> /dev/null &
     elif command -v yum &> /dev/null; then
-        sudo yum install -y python3 python3-pip
+        sudo yum install -y python3 python3-pip &> /dev/null &
     elif command -v dnf &> /dev/null; then
-        sudo dnf install -y python3 python3-pip
+        sudo dnf install -y python3 python3-pip &> /dev/null &
     else
         print_message "package_manager_fail"
         exit 1
     fi
+    wait
 
     if ! command -v python3 &> /dev/null; then
         print_message "install_fail"
@@ -132,11 +133,9 @@ check_and_install_packages() {
         echo -e "${YELLOW}${missing_packages[@]}${NC}"
         print_message "installing_packages"
         for package in "${missing_packages[@]}"; do
-            pip3 install "$package"
-            if [ $? -ne 0 ]; then
-                echo -e "${RED}Failed to install package: $package${NC}"
-            fi
+            pip3 install "$package" &> /dev/null &
         done
+        wait
     fi
 }
 
