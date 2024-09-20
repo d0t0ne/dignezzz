@@ -45,7 +45,7 @@ jobs:
           git config user.name "GitHub Action"
           git config user.email "dignezzz@gmail.com"
           git add README.md
-          git commit -m "Auto-generate README with script links"
+          git commit -m "Auto-generate README with script links at $(date)"
           git push
 
       - name: Setup Pages
