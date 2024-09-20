@@ -7,7 +7,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-trap "echo -e '\n${RED}Скрипт прерван пользователем.${NC}' && exit 1" SIGINT
+trap "echo -e '\n${RED}Script interrupted by user.${NC}' && exit 1" SIGINT
 
 check_dependencies() {
     dependencies=("wget" "sudo")
@@ -19,8 +19,8 @@ check_dependencies() {
     done
 
     if [ ${#missing[@]} -ne 0 ]; then
-        echo -e "${RED}Следующие зависимости отсутствуют:${NC} ${missing[@]}"
-        echo -e "${YELLOW}Пожалуйста, установите их вручную и повторите запуск скрипта.${NC}"
+        echo -e "${RED}The following dependencies are missing:${NC} ${missing[@]}"
+        echo -e "${YELLOW}Please install them manually and re-run the script.${NC}"
         exit 1
     fi
 }
@@ -40,6 +40,8 @@ declare -A MESSAGES_EN=(
     ["missing_packages"]="The following Python packages are missing: "
     ["installing_packages"]="Installing missing Python packages..."
     ["wget_missing"]="wget is not installed. Please install wget and try again."
+    ["install_pip"]="Installing pip3 using ensurepip..."
+    ["install_pip_fail"]="Failed to install pip3."
 )
 
 declare -A MESSAGES_RU=(
@@ -55,6 +57,8 @@ declare -A MESSAGES_RU=(
     ["missing_packages"]="Отсутствуют следующие Python-библиотеки: "
     ["installing_packages"]="Устанавливаем отсутствующие Python-библиотеки..."
     ["wget_missing"]="wget не установлен. Пожалуйста, установите wget и попробуйте снова."
+    ["install_pip"]="Устанавливаем pip3 с помощью ensurepip..."
+    ["install_pip_fail"]="Не удалось установить pip3."
 )
 
 LANG_CHOICE=1
@@ -92,20 +96,34 @@ choose_language() {
     echo ""
 }
 
+install_pip3() {
+    print_message "install_pip"
+    python3 -m ensurepip --upgrade &> /dev/null
+    if ! command -v pip3 &> /dev/null; then
+        wget https://bootstrap.pypa.io/get-pip.py -O /tmp/get-pip.py &> /dev/null
+        python3 /tmp/get-pip.py &> /dev/null
+        rm /tmp/get-pip.py
+    fi
+
+    if ! command -v pip3 &> /dev/null; then
+        print_message "install_pip_fail"
+        exit 1
+    fi
+}
+
 install_python_and_packages() {
     print_message "update_python"
     if command -v apt-get &> /dev/null; then
-        sudo apt-get update -y &> /dev/null &
-        sudo apt-get install -y python3 python3-pip &> /dev/null &
+        sudo apt-get update -y &> /dev/null
+        sudo apt-get install -y python3 python3-pip &> /dev/null
     elif command -v yum &> /dev/null; then
-        sudo yum install -y python3 python3-pip &> /dev/null &
+        sudo yum install -y python3 python3-pip &> /dev/null
     elif command -v dnf &> /dev/null; then
-        sudo dnf install -y python3 python3-pip &> /dev/null &
+        sudo dnf install -y python3 python3-pip &> /dev/null
     else
         print_message "package_manager_fail"
         exit 1
     fi
-    wait
 
     if ! command -v python3 &> /dev/null; then
         print_message "install_fail"
@@ -113,8 +131,7 @@ install_python_and_packages() {
     fi
 
     if ! command -v pip3 &> /dev/null; then
-        echo -e "${RED}pip3 was not installed successfully.${NC}"
-        exit 1
+        install_pip3
     fi
 }
 
@@ -133,9 +150,11 @@ check_and_install_packages() {
         echo -e "${YELLOW}${missing_packages[@]}${NC}"
         print_message "installing_packages"
         for package in "${missing_packages[@]}"; do
-            pip3 install "$package" &> /dev/null &
+            pip3 install "$package" &> /dev/null
+            if [ $? -ne 0 ]; then
+                echo -e "${RED}Failed to install package: $package${NC}"
+            fi
         done
-        wait
     fi
 }
 
