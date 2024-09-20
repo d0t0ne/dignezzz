@@ -25,3 +25,5 @@
 | ssh-port.sh | `bash <(wget -qO- https://dignezzz.github.io/server/ssh-port.sh)` |
 | unlimit_server.sh | `bash <(wget -qO- https://dignezzz.github.io/server/unlimit_server.sh)` |
 
+
+_Last updated at Fri Sep 20 13:11:35 UTC 2024_ 
