@@ -46,7 +46,11 @@ function check_tls() {
       TLS_RESULT=true
     else
       tls_version=$(echo | timeout 5 openssl s_client -connect $HOSTNAME:$PORT 2>/dev/null | grep "Protocol" | awk '{print $2}')
-      echo -e "${YELLOW}TLS 1.3 не поддерживается. Используемая версия: ${tls_version}${RESET}"
+      if [ -n "$tls_version" ]; then
+        echo -e "${YELLOW}TLS 1.3 не поддерживается. Используемая версия: ${tls_version}${RESET}"
+      else
+        echo -e "${RED}Не удалось определить используемую версию TLS${RESET}"
+      fi
       TLS_RESULT=false
     fi
   else
@@ -87,21 +91,6 @@ function determine_rating() {
   else
     echo -e "${YELLOW}Не удалось определить пинг, рейтинг устанавливается на 0${RESET}"
     RATING=0
-  fi
-
-  if [ $RATING -ge 3 ] && [ "$TLS_RESULT" = true ] && [ "$CDN_RESULT" = false ]; then
-    echo -e "${GREEN}Сайт подходит как dest для Reality${RESET}"
-  else
-    echo -e "${RED}Сайт не подходит как dest для Reality по следующим причинам:${RESET}"
-    if [ $RATING -lt 3 ]; then
-      echo -e "${YELLOW}- Рейтинг по пингу ниже 3 (${RATING}/5)${RESET}"
-    fi
-    if [ "$TLS_RESULT" != true ]; then
-      echo -e "${YELLOW}- Не поддерживается TLS 1.3${RESET}"
-    fi
-    if [ "$CDN_RESULT" = true ]; then
-      echo -e "${YELLOW}- Обнаружено использование CDN${RESET}"
-    fi
   fi
 }
 
@@ -224,6 +213,57 @@ function check_cdn() {
   echo -e "${GREEN}CDN не используется${RESET}"
 }
 
+# Функция для вывода результатов проверки
+function check_dest_for_reality() {
+  local reasons=()
+  local positives=()
+
+  # Проверка рейтинга по пингу
+  if [ "$PING_RESULT" = true ]; then
+    if [ $RATING -ge 3 ]; then
+      positives+=("Рейтинг по пингу: ${RATING}/5")
+    else
+      reasons+=("Рейтинг по пингу ниже 3 (${RATING}/5)")
+    fi
+  else
+    reasons+=("Не удалось выполнить пинг до хоста")
+  fi
+
+  # Проверка TLS 1.3
+  if [ "$TLS_RESULT" = true ]; then
+    positives+=("Поддерживается TLS 1.3")
+  else
+    reasons+=("Не поддерживается TLS 1.3")
+  fi
+
+  # Проверка CDN
+  if [ "$CDN_RESULT" = false ]; then
+    positives+=("CDN не используется")
+  else
+    reasons+=("Обнаружено использование CDN")
+  fi
+
+  echo -e "\n${CYAN}===== Результаты проверки =====${RESET}"
+
+  if [ ${#reasons[@]} -eq 0 ]; then
+    echo -e "${GREEN}Сайт подходит как dest для Reality по следующим причинам:${RESET}"
+    for positive in "${positives[@]}"; do
+      echo -e "${GREEN}- $positive${RESET}"
+    done
+  else
+    echo -e "${RED}Сайт не подходит как dest для Reality по следующим причинам:${RESET}"
+    for reason in "${reasons[@]}"; do
+      echo -e "${YELLOW}- $reason${RESET}"
+    done
+    if [ ${#positives[@]} -gt 0 ]; then
+      echo -e "\n${GREEN}Положительные моменты:${RESET}"
+      for positive in "${positives[@]}"; do
+        echo -e "${GREEN}- $positive${RESET}"
+      done
+    fi
+  fi
+}
+
 # Проверка, введен ли хост
 if [ -z "$1" ]; then
   echo -e "${RED}Использование: $0 <хост[:порт]>${RESET}"
@@ -280,3 +320,4 @@ fi
 
 calculate_average_ping
 determine_rating
+check_dest_for_reality
