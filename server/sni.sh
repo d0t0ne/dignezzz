@@ -1,6 +1,5 @@
 #!/bin/bash
-
-
+clear
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -8,9 +7,10 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
+trap "echo -e '\n${RED}Скрипт прерван пользователем.${NC}' && exit 1" SIGINT
 
 check_dependencies() {
-    dependencies=("wget" "sudo" "python3" "pip3")
+    dependencies=("wget" "sudo")
     missing=()
     for cmd in "${dependencies[@]}"; do
         if ! command -v "$cmd" &> /dev/null; then
@@ -19,14 +19,13 @@ check_dependencies() {
     done
 
     if [ ${#missing[@]} -ne 0 ]; then
-        echo -e "${RED}The following dependencies are missing:${NC} ${missing[@]}"
-        echo -e "${YELLOW}Please install them manually and re-run the script.${NC}"
+        echo -e "${RED}Следующие зависимости отсутствуют:${NC} ${missing[@]}"
+        echo -e "${YELLOW}Пожалуйста, установите их вручную и повторите запуск скрипта.${NC}"
         exit 1
     fi
 }
 
 check_dependencies
-
 
 declare -A MESSAGES_EN=(
     ["select_language"]="Select Language:"
@@ -58,9 +57,7 @@ declare -A MESSAGES_RU=(
     ["wget_missing"]="wget не установлен. Пожалуйста, установите wget и попробуйте снова."
 )
 
-
 LANG_CHOICE=1
-
 
 print_message() {
     local key=$1
@@ -70,7 +67,6 @@ print_message() {
         echo -e "${MESSAGES_RU[$key]}"
     fi
 }
-
 
 choose_language() {
     echo -e "${BLUE}${MESSAGES_EN["select_language"]}${NC}"
@@ -86,18 +82,15 @@ choose_language() {
             LANG_CHOICE=2
             ;;
         "")
-         
             LANG_CHOICE=1
             print_message "default_lang"
             ;;
         *)
-  
             print_message "invalid_option"
             ;;
     esac
-    echo ""  
+    echo ""
 }
-
 
 install_python_and_packages() {
     print_message "update_python"
@@ -117,8 +110,12 @@ install_python_and_packages() {
         print_message "install_fail"
         exit 1
     fi
-}
 
+    if ! command -v pip3 &> /dev/null; then
+        echo -e "${RED}pip3 was not installed successfully.${NC}"
+        exit 1
+    fi
+}
 
 check_and_install_packages() {
     required_packages=("sys" "subprocess" "requests" "time" "threading" "socket" "shutil" "json" "rich")
@@ -136,10 +133,12 @@ check_and_install_packages() {
         print_message "installing_packages"
         for package in "${missing_packages[@]}"; do
             pip3 install "$package"
+            if [ $? -ne 0 ]; then
+                echo -e "${RED}Failed to install package: $package${NC}"
+            fi
         done
     fi
 }
-
 
 run_python_script() {
     if [ "$LANG_CHOICE" = "1" ]; then
@@ -148,26 +147,20 @@ run_python_script() {
         SCRIPT_URL="https://dignezzz.github.io/server/sni_ru.py"
     fi
 
-
     if ! command -v wget &> /dev/null; then
         print_message "wget_missing"
         exit 1
     fi
 
-
     python3 <(wget -qO- "$SCRIPT_URL") "$@"
 }
 
-
 choose_language
 
-
-if ! command -v python3 &> /dev/null; then
+if ! command -v python3 &> /dev/null || ! command -v pip3 &> /dev/null; then
     install_python_and_packages
 fi
 
-
 check_and_install_packages
-clear
 
 run_python_script "$@"
