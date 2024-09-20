@@ -28,23 +28,29 @@ results = {
 
 # Обновленная функция check_tls
 def check_tls(domain):
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    context.minimum_version = ssl.TLSVersion.TLSv1_3
-    context.maximum_version = ssl.TLSVersion.TLSv1_3
     try:
-        with socket.create_connection((domain, 443), timeout=5) as sock:
-            with context.wrap_socket(sock, server_hostname=domain) as ssock:
-                protocol_version = ssock.version()
-                if protocol_version == 'TLSv1.3':
-                    results["tls"] = True
-                    results["positives"].append("Поддерживается TLS 1.3")
-                else:
-                    results["negatives"].append(f"Не поддерживается TLS 1.3 (используется {protocol_version})")
-    except ssl.SSLError as e:
-        results["negatives"].append("Не поддерживается TLS 1.3")
+        # Попытка подключения с использованием TLS 1.3
+        proc = subprocess.run(
+            ["openssl", "s_client", "-connect", f"{domain}:443", "-tls1_3"],
+            input="",  # Передаем пустую строку, чтобы избежать зависания
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=10,
+            text=True,
+        )
+        output = proc.stdout
+
+        if "TLSv1.3" in output:
+            results["tls"] = True
+            results["positives"].append("Поддерживается TLS 1.3")
+        elif "no protocols available" in output or "handshake failure" in output:
+            results["negatives"].append("Не поддерживается TLS 1.3")
+        else:
+            results["negatives"].append("Не удалось определить поддержку TLS 1.3")
+    except subprocess.TimeoutExpired:
+        results["negatives"].append("Время ожидания подключения истекло")
     except Exception as e:
         results["negatives"].append(f"Ошибка при проверке TLS: {e}")
-
 # Остальные функции остаются без изменений
 def check_http2(domain):
     try:
@@ -160,20 +166,22 @@ def display_results():
         for positive in results["positives"]:
             console.print(f"[green]- {positive}[/green]")
 
+
+
 def main(domain):
     results["domain"] = domain
 
     # Создаем прогресс-бар
     with Progress(
         SpinnerColumn(finished_text="✅"),
-        TextColumn("{task.fields[status]}"),
+        TextColumn("{task.description}"),
     ) as progress:
         tasks = []
-        tasks.append(progress.add_task("", status="Проверка поддержки TLS 1.3...", total=1))
-        tasks.append(progress.add_task("", status="Проверка поддержки HTTP/2...", total=1))
-        tasks.append(progress.add_task("", status="Проверка наличия CDN...", total=1))
-        tasks.append(progress.add_task("", status="Проверка переадресации...", total=1))
-        tasks.append(progress.add_task("", status="Вычисление пинга...", total=1))
+        tasks.append(progress.add_task("Проверка поддержки TLS 1.3...", total=1))
+        tasks.append(progress.add_task("Проверка поддержки HTTP/2...", total=1))
+        tasks.append(progress.add_task("Проверка наличия CDN...", total=1))
+        tasks.append(progress.add_task("Проверка переадресации...", total=1))
+        tasks.append(progress.add_task("Вычисление пинга...", total=1))
 
         threads = []
 
