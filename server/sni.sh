@@ -39,6 +39,7 @@ choose_language() {
         print_message "option1"
         print_message "option2"
         read -rp ">> " lang
+        lang=${lang:-1} 
         case $lang in
             1)
                 LANG_CHOICE=1
