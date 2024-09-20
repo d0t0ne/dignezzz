@@ -62,8 +62,8 @@ NC='\033[0m' # No color
 # Menu for user selection
 echo -e "The domain being checked is: ${GREEN}$domain_port${NC}"
 echo -e "Select an option to check:"
-echo -e "1. Check host '$domain' for use as ${GREEN}Reality ServerName${NC} (domain only)"
-echo -e "2. Check host '$domain_port' for use as ${RED}Reality Dest${NC}"
+echo -e "1. Check host ${RED}'$domain'${NC} for use as ${GREEN}Reality ServerName${NC} (domain only)"
+echo -e "2. Check host ${RED}'$domain_port'${NC} for use as ${GREEN}Reality Dest${NC}"
 
 read -p "Enter your choice (1 or 2): " choice
 
