@@ -1,11 +1,9 @@
 import sys
-import socket
 import subprocess
 import requests
-import json
 import time
 import threading
-import ssl
+import socket
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -15,6 +13,7 @@ console = Console()
 # Глобальные результаты
 results = {
     "domain": "",
+    "port": None,
     "tls": False,
     "http2": False,
     "cdn": False,
@@ -26,12 +25,18 @@ results = {
     "positives": [],
 }
 
-# Обновленная функция check_tls
-def check_tls(domain):
+def check_port_availability(domain, port, timeout=5):
+    try:
+        with socket.create_connection((domain, port), timeout=timeout):
+            return True
+    except:
+        return False
+
+def check_tls(domain, port):
     try:
         # Попытка подключения с использованием TLS 1.3
         proc = subprocess.run(
-            ["openssl", "s_client", "-connect", f"{domain}:443", "-tls1_3"],
+            ["openssl", "s_client", "-connect", f"{domain}:{port}", "-tls1_3"],
             input="",  # Передаем пустую строку, чтобы избежать зависания
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -40,22 +45,38 @@ def check_tls(domain):
         )
         output = proc.stdout
 
-        if "TLSv1.3" in output:
+        if "Protocol  : TLSv1.3" in output:
             results["tls"] = True
             results["positives"].append("Поддерживается TLS 1.3")
-        elif "no protocols available" in output or "handshake failure" in output:
-            results["negatives"].append("Не поддерживается TLS 1.3")
         else:
-            results["negatives"].append("Не удалось определить поддержку TLS 1.3")
+            # Если TLS 1.3 не поддерживается, пробуем без указания версии
+            proc = subprocess.run(
+                ["openssl", "s_client", "-connect", f"{domain}:{port}"],
+                input="",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                timeout=10,
+                text=True,
+            )
+            output = proc.stdout
+            # Ищем строку с версией протокола
+            for line in output.splitlines():
+                if "Protocol  :" in line:
+                    tls_version = line.split(":", 1)[1].strip()
+                    results["negatives"].append(f"Не поддерживается TLS 1.3 (используется {tls_version})")
+                    break
+            else:
+                results["negatives"].append("Не поддерживается TLS 1.3 (не удалось определить текущую версию TLS)")
     except subprocess.TimeoutExpired:
-        results["negatives"].append("Время ожидания подключения истекло")
+        results["negatives"].append("Время ожидания подключения истекло при проверке TLS")
     except Exception as e:
         results["negatives"].append(f"Ошибка при проверке TLS: {e}")
-# Остальные функции остаются без изменений
-def check_http2(domain):
+
+def check_http2(domain, port):
     try:
+        # Пробуем запрос с поддержкой HTTP/2
         proc = subprocess.run(
-            ["curl", "-I", "-s", "--http2", f"https://{domain}"],
+            ["curl", "-I", "-s", "--http2", f"https://{domain}:{port}"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=5,
@@ -65,11 +86,26 @@ def check_http2(domain):
             results["http2"] = True
             results["positives"].append("Поддерживается HTTP/2")
         else:
-            results["negatives"].append("Не поддерживается HTTP/2")
+            # Если HTTP/2 не поддерживается, выполняем обычный запрос
+            proc = subprocess.run(
+                ["curl", "-I", "-s", f"https://{domain}:{port}"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=5,
+                text=True,
+            )
+            # Ищем строку со статусом ответа
+            for line in proc.stdout.splitlines():
+                if line.startswith("HTTP/"):
+                    http_version = line.split(" ", 1)[0].strip()
+                    results["negatives"].append(f"Не поддерживается HTTP/2 (используется {http_version})")
+                    break
+            else:
+                results["negatives"].append("Не удалось определить версию HTTP")
     except Exception as e:
         results["negatives"].append(f"Ошибка при проверке HTTP/2: {e}")
 
-def check_cdn(domain):
+def check_cdn(domain, port):
     cdn_providers = {
         "cloudflare": "Cloudflare",
         "akamai": "Akamai",
@@ -86,7 +122,7 @@ def check_cdn(domain):
         "tencent": "Tencent Cloud CDN",
     }
     try:
-        response = requests.head(f"https://{domain}", timeout=5)
+        response = requests.head(f"https://{domain}:{port}", timeout=5)
         headers = response.headers
         header_str = str(headers).lower()
         for key, provider in cdn_providers.items():
@@ -99,9 +135,9 @@ def check_cdn(domain):
     except Exception as e:
         results["negatives"].append(f"Ошибка при проверке CDN: {e}")
 
-def check_redirect(domain):
+def check_redirect(domain, port):
     try:
-        response = requests.get(f"https://{domain}", timeout=5, allow_redirects=False)
+        response = requests.get(f"https://{domain}:{port}", timeout=5, allow_redirects=False)
         if 300 <= response.status_code < 400:
             results["redirect"] = True
             results["negatives"].append(f"Найдена переадресация: {response.headers.get('Location')}")
@@ -166,10 +202,43 @@ def display_results():
         for positive in results["positives"]:
             console.print(f"[green]- {positive}[/green]")
 
+    # Итоговое сообщение
+    port_display = results['port'] if results['port'] else '443/80'
+    if not results["negatives"] or (len(results["negatives"]) == 1 and any("Использование CDN" in neg for neg in results["negatives"])):
+        console.print(f"\n[bold green]Хост {results['domain']}:{port_display} подходит в качестве dest[/bold green]")
+    else:
+        console.print(f"\n[bold red]Хост {results['domain']}:{port_display} НЕ подходит в качестве dest[/bold red]")
 
+def main(domain_input):
+    if ':' in domain_input:
+        domain, port = domain_input.split(':', 1)
+        port = int(port)
+    else:
+        domain = domain_input
+        port = None
 
-def main(domain):
     results["domain"] = domain
+    results["port"] = port
+
+    console.print(f"\n[bold cyan]Проверка хоста:[/bold cyan] {domain}")
+    if port:
+        console.print(f"[bold cyan]Порт:[/bold cyan] {port}")
+        ports_to_check = [port]
+    else:
+        console.print(f"[bold cyan]Порты по умолчанию:[/bold cyan] 443, 80")
+        ports_to_check = [443, 80]
+
+    # Проверяем доступность портов
+    for port in ports_to_check:
+        if check_port_availability(domain, port):
+            results["port"] = port
+            console.print(f"[green]Порт {port} доступен. Продолжаем проверку...[/green]")
+            break
+        else:
+            console.print(f"[yellow]Порт {port} недоступен. Пробуем следующий порт...[/yellow]")
+    else:
+        console.print(f"[red]Хост {domain} недоступен на портах {', '.join(map(str, ports_to_check))}[/red]")
+        sys.exit(1)
 
     # Создаем прогресс-бар
     with Progress(
@@ -186,10 +255,10 @@ def main(domain):
         threads = []
 
         # Запускаем проверки в отдельных потоках
-        t_tls = threading.Thread(target=lambda: [check_tls(domain), progress.update(tasks[0], completed=1)])
-        t_http2 = threading.Thread(target=lambda: [check_http2(domain), progress.update(tasks[1], completed=1)])
-        t_cdn = threading.Thread(target=lambda: [check_cdn(domain), progress.update(tasks[2], completed=1)])
-        t_redirect = threading.Thread(target=lambda: [check_redirect(domain), progress.update(tasks[3], completed=1)])
+        t_tls = threading.Thread(target=lambda: [check_tls(domain, port), progress.update(tasks[0], completed=1)])
+        t_http2 = threading.Thread(target=lambda: [check_http2(domain, port), progress.update(tasks[1], completed=1)])
+        t_cdn = threading.Thread(target=lambda: [check_cdn(domain, port), progress.update(tasks[2], completed=1)])
+        t_redirect = threading.Thread(target=lambda: [check_redirect(domain, port), progress.update(tasks[3], completed=1)])
         t_ping = threading.Thread(target=lambda: [calculate_ping(domain), progress.update(tasks[4], completed=1)])
 
         threads.extend([t_tls, t_http2, t_cdn, t_redirect, t_ping])
@@ -206,7 +275,7 @@ def main(domain):
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        console.print("[bold red]Использование: script.py <домен>[/bold red]")
+        console.print("[bold red]Использование: script.py <домен[:порт]>[/bold red]")
         sys.exit(1)
-    domain = sys.argv[1]
-    main(domain)
+    domain_input = sys.argv[1]
+    main(domain_input)
