@@ -1,110 +1,3 @@
-#!/bin/bash
-
-# Цвета для подсветки текста
-GREEN="\033[32m"
-YELLOW="\033[33m"
-RED="\033[31m"
-CYAN="\033[36m"
-RESET="\033[0m"
-
-PING_RESULT=false
-TLS_RESULT=false
-CDN_RESULT=false
-
-# Функция для проверки и установки утилиты
-function check_and_install_command() {
-  if ! command -v $1 &> /dev/null; then
-    echo -e "${YELLOW}Утилита $1 не найдена. Устанавливаю...${RESET}"
-    sudo apt-get install -y $1 > /dev/null 2>&1
-    if ! command -v $1 &> /dev/null; then
-      echo -e "${RED}Ошибка: не удалось установить $1. Установите её вручную.${RESET}"
-      exit 1
-    fi
-  fi
-}
-
-# Функция для проверки доступности хоста и порта
-function check_host_port() {
-  echo -e "${CYAN}Проверка доступности $HOSTNAME на порту $PORT...${RESET}"
-  timeout 5 bash -c "</dev/tcp/$HOSTNAME/$PORT" &>/dev/null
-  if [ $? -eq 0 ]; then
-    echo -e "${GREEN}Хост $HOSTNAME:$PORT доступен${RESET}"
-    HOST_PORT_AVAILABLE=true
-  else
-    echo -e "${YELLOW}Хост $HOSTNAME:$PORT недоступен${RESET}"
-    HOST_PORT_AVAILABLE=false
-  fi
-}
-
-# Функция для проверки поддержки TLS 1.3
-function check_tls() {
-  if [ "$PORT" == "443" ]; then
-    echo -e "${CYAN}Проверка поддержки TLS для $HOSTNAME:$PORT...${RESET}"
-    tls_version=$(echo | timeout 5 openssl s_client -connect $HOSTNAME:$PORT -tls1_3 2>/dev/null | grep "TLSv1.3")
-    if [[ -n $tls_version ]]; then
-      echo -e "${GREEN}TLS 1.3 поддерживается${RESET}"
-      TLS_RESULT=true
-    else
-      tls_version=$(echo | timeout 5 openssl s_client -connect $HOSTNAME:$PORT 2>/dev/null | grep "Protocol" | awk '{print $2}')
-      echo -e "${YELLOW}TLS 1.3 не поддерживается. Используемая версия: ${tls_version}${RESET}"
-      TLS_RESULT=false
-    fi
-  else
-    TLS_RESULT=true  # Предполагаем, что TLS не требуется на других портах
-  fi
-}
-
-# Функция для вычисления среднего пинга
-function calculate_average_ping() {
-  echo -e "${CYAN}Вычисление среднего пинга до $HOSTNAME...${RESET}"
-  ping_output=$(ping -c 5 -q $HOSTNAME)
-  if [ $? -ne 0 ]; then
-    echo -e "${RED}Не удалось выполнить пинг до $HOSTNAME${RESET}"
-    PING_RESULT=false
-    avg_ping=1000  # Устанавливаем высокое значение пинга
-  else
-    avg_ping=$(echo "$ping_output" | grep "rtt" | awk -F '/' '{print $5}')
-    echo -e "${GREEN}Средний пинг: ${avg_ping} мс${RESET}"
-    PING_RESULT=true
-  fi
-}
-
-# Функция для определения рейтинга
-function determine_rating() {
-  if [ "$PING_RESULT" = true ]; then
-    if (( $(echo "$avg_ping < 2" | bc -l) )); then
-      RATING=5
-    elif (( $(echo "$avg_ping >= 2 && $avg_ping < 4" | bc -l) )); then
-      RATING=4
-    elif (( $(echo "$avg_ping >= 4 && $avg_ping < 6" | bc -l) )); then
-      RATING=3
-    elif (( $(echo "$avg_ping >= 6 && $avg_ping < 8" | bc -l) )); then
-      RATING=2
-    else
-      RATING=1
-    fi
-    echo -e "${CYAN}Рейтинг на основе пинга: ${RATING}/5${RESET}"
-  else
-    echo -e "${YELLOW}Не удалось определить пинг, рейтинг устанавливается на 0${RESET}"
-    RATING=0
-  fi
-
-  if [ $RATING -ge 3 ] && [ "$TLS_RESULT" = true ] && [ "$CDN_RESULT" = false ]; then
-    echo -e "${GREEN}Сайт подходит как dest для Reality${RESET}"
-  else
-    echo -e "${RED}Сайт не подходит как dest для Reality по следующим причинам:${RESET}"
-    if [ $RATING -lt 3 ]; then
-      echo -e "${YELLOW}- Рейтинг по пингу ниже 3 (${RATING}/5)${RESET}"
-    fi
-    if [ "$TLS_RESULT" != true ]; then
-      echo -e "${YELLOW}- Не поддерживается TLS 1.3${RESET}"
-    fi
-    if [ "$CDN_RESULT" = true ]; then
-      echo -e "${YELLOW}- Обнаружено использование CDN${RESET}"
-    fi
-  fi
-}
-
 # Функция для анализа HTTP-заголовков на наличие CDN
 function check_cdn_headers() {
   echo -e "${CYAN}Анализ HTTP-заголовков для определения CDN...${RESET}"
@@ -116,6 +9,42 @@ function check_cdn_headers() {
     CDN_RESULT=true
   elif echo "$headers" | grep -iq "akamai"; then
     echo -e "${YELLOW}Используется CDN: Akamai (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "fastly"; then
+    echo -e "${YELLOW}Используется CDN: Fastly (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "incapsula"; then
+    echo -e "${YELLOW}Используется CDN: Imperva Incapsula (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "sucuri"; then
+    echo -e "${YELLOW}Используется CDN: Sucuri (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "stackpath"; then
+    echo -e "${YELLOW}Используется CDN: StackPath (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "cdn77"; then
+    echo -e "${YELLOW}Используется CDN: CDN77 (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "edgecast"; then
+    echo -e "${YELLOW}Используется CDN: Verizon Edgecast (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "keycdn"; then
+    echo -e "${YELLOW}Используется CDN: KeyCDN (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "azurecdn"; then
+    echo -e "${YELLOW}Используется CDN: Microsoft Azure CDN (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "aliyun"; then
+    echo -e "${YELLOW}Используется CDN: Alibaba Cloud CDN (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "baidu"; then
+    echo -e "${YELLOW}Используется CDN: Baidu Cloud CDN (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "tencent"; then
+    echo -e "${YELLOW}Используется CDN: Tencent Cloud CDN (по заголовкам)${RESET}"
+    CDN_RESULT=true
+  elif echo "$headers" | grep -iq "cdn"; then
+    echo -e "${YELLOW}Обнаружены признаки использования CDN (по заголовкам)${RESET}"
     CDN_RESULT=true
   else
     echo -e "${GREEN}По заголовкам CDN не обнаружен${RESET}"
@@ -133,6 +62,39 @@ function check_cdn_certificate() {
       CDN_RESULT=true
     elif echo "$cert_info" | grep -iq "Akamai"; then
       echo -e "${YELLOW}Используется CDN: Akamai (по SSL-сертификату)${RESET}"
+      CDN_RESULT=true
+    elif echo "$cert_info" | grep -iq "Fastly"; then
+      echo -e "${YELLOW}Используется CDN: Fastly (по SSL-сертификату)${RESET}"
+      CDN_RESULT=true
+    elif echo "$cert_info" | grep -iq "Incapsula"; then
+      echo -e "${YELLOW}Используется CDN: Imperva Incapsula (по SSL-сертификату)${RESET}"
+      CDN_RESULT=true
+    elif echo "$cert_info" | grep -iq "Sucuri"; then
+      echo -e "${YELLOW}Используется CDN: Sucuri (по SSL-сертификату)${RESET}"
+      CDN_RESULT=true
+    elif echo "$cert_info" | grep -iq "StackPath"; then
+      echo -e "${YELLOW}Используется CDN: StackPath (по SSL-сертификату)${RESET}"
+      CDN_RESULT=true
+    elif echo "$cert_info" | grep -iq "CDN77"; then
+      echo -e "${YELLOW}Используется CDN: CDN77 (по SSL-сертификату)${RESET}"
+      CDN_RESULT=true
+    elif echo "$cert_info" | grep -iq "Edgecast"; then
+      echo -e "${YELLOW}Используется CDN: Verizon Edgecast (по SSL-сертификату)${RESET}"
+      CDN_RESULT=true
+    elif echo "$cert_info" | grep -iq "KeyCDN"; then
+      echo -e "${YELLOW}Используется CDN: KeyCDN (по SSL-сертификату)${RESET}"
+      CDN_RESULT=true
+    elif echo "$cert_info" | grep -iq "Microsoft"; then
+      echo -e "${YELLOW}Используется CDN: Microsoft Azure CDN (по SSL-сертификату)${RESET}"
+      CDN_RESULT=true
+    elif echo "$cert_info" | grep -iq "Alibaba"; then
+      echo -e "${YELLOW}Используется CDN: Alibaba Cloud CDN (по SSL-сертификату)${RESET}"
+      CDN_RESULT=true
+    elif echo "$cert_info" | grep -iq "Baidu"; then
+      echo -e "${YELLOW}Используется CDN: Baidu Cloud CDN (по SSL-сертификату)${RESET}"
+      CDN_RESULT=true
+    elif echo "$cert_info" | grep -iq "Tencent"; then
+      echo -e "${YELLOW}Используется CDN: Tencent Cloud CDN (по SSL-сертификату)${RESET}"
       CDN_RESULT=true
     else
       echo -e "${GREEN}CDN не обнаружен по SSL-сертификату${RESET}"
@@ -154,60 +116,3 @@ function check_cdn() {
 
   echo -e "${GREEN}CDN не используется${RESET}"
 }
-
-# Проверка, введен ли хост
-if [ -z "$1" ]; then
-  echo -e "${RED}Использование: $0 <хост[:порт]>${RESET}"
-  exit 1
-fi
-
-# Разбор хоста и порта
-INPUT="$1"
-if [[ $INPUT == *":"* ]]; then
-  HOSTNAME=$(echo $INPUT | cut -d':' -f1)
-  PORT=$(echo $INPUT | cut -d':' -f2)
-else
-  HOSTNAME="$INPUT"
-  PORT=""
-fi
-
-# Если порт не указан, попробуем стандартные порты
-if [ -z "$PORT" ]; then
-  PORTS=(443 80)
-else
-  PORTS=($PORT)
-fi
-
-# Проверка необходимых утилит и установка при необходимости
-check_and_install_command openssl
-check_and_install_command ping
-check_and_install_command bc
-
-# Флаг для определения доступности хоста на каком-либо порту
-HOST_AVAILABLE=false
-
-# Попытка подключиться по разным портам
-for PORT in "${PORTS[@]}"; do
-  # Определяем протокол
-  if [ "$PORT" == "443" ]; then
-    PROTOCOL="https"
-  else
-    PROTOCOL="http"
-  fi
-
-  check_host_port
-  if [ "$HOST_PORT_AVAILABLE" = true ]; then
-    HOST_AVAILABLE=true
-    check_tls
-    check_cdn
-    break
-  fi
-done
-
-if [ "$HOST_AVAILABLE" = false ]; then
-  echo -e "${RED}Хост $HOSTNAME недоступен на портах ${PORTS[*]}${RESET}"
-  exit 1
-fi
-
-calculate_average_ping
-determine_rating
