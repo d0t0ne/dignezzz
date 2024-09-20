@@ -32,47 +32,57 @@ def check_port_availability(domain, port, timeout=5):
     except:
         return False
 
-def check_tls(domain, port):
+def check_tls(domain, port, progress, task_id):
     try:
         # Попытка подключения с использованием TLS 1.3
         proc = subprocess.run(
             ["openssl", "s_client", "-connect", f"{domain}:{port}", "-tls1_3"],
             input="",  # Передаем пустую строку, чтобы избежать зависания
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
+            stderr=subprocess.PIPE,
             timeout=10,
             text=True,
         )
-        output = proc.stdout
+        output = proc.stdout + proc.stderr
 
-        if "Protocol  : TLSv1.3" in output:
+        if proc.returncode == 0 and ("TLSv1.3" in output or "New, TLSv1.3" in output):
             results["tls"] = True
             results["positives"].append("Поддерживается TLS 1.3")
+            progress.update(task_id, description="Проверка поддержки TLS 1.3... [green]Поддерживается[/green]", completed=1)
         else:
             # Если TLS 1.3 не поддерживается, пробуем без указания версии
             proc = subprocess.run(
                 ["openssl", "s_client", "-connect", f"{domain}:{port}"],
                 input="",
                 stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
+                stderr=subprocess.PIPE,
                 timeout=10,
                 text=True,
             )
-            output = proc.stdout
+            output = proc.stdout + proc.stderr
             # Ищем строку с версией протокола
+            tls_version = None
             for line in output.splitlines():
                 if "Protocol  :" in line:
                     tls_version = line.split(":", 1)[1].strip()
-                    results["negatives"].append(f"Не поддерживается TLS 1.3 (используется {tls_version})")
                     break
+                elif "Protocol :" in line:
+                    tls_version = line.split(":", 1)[1].strip()
+                    break
+            if tls_version:
+                results["negatives"].append(f"Не поддерживается TLS 1.3 (используется {tls_version})")
+                progress.update(task_id, description=f"Проверка поддержки TLS 1.3... [red]Не поддерживается[/red] ({tls_version})", completed=1)
             else:
                 results["negatives"].append("Не поддерживается TLS 1.3 (не удалось определить текущую версию TLS)")
+                progress.update(task_id, description="Проверка поддержки TLS 1.3... [red]Не удалось определить версию[/red]", completed=1)
     except subprocess.TimeoutExpired:
         results["negatives"].append("Время ожидания подключения истекло при проверке TLS")
+        progress.update(task_id, description="Проверка поддержки TLS 1.3... [red]Ошибка[/red] (Timeout)", completed=1)
     except Exception as e:
         results["negatives"].append(f"Ошибка при проверке TLS: {e}")
+        progress.update(task_id, description=f"Проверка поддержки TLS 1.3... [red]Ошибка[/red]", completed=1)
 
-def check_http2(domain, port):
+def check_http2(domain, port, progress, task_id):
     try:
         # Пробуем запрос с поддержкой HTTP/2
         proc = subprocess.run(
@@ -82,9 +92,10 @@ def check_http2(domain, port):
             timeout=5,
             text=True,
         )
-        if "HTTP/2" in proc.stdout:
+        if "HTTP/2" in proc.stdout or "HTTP/2" in proc.stderr:
             results["http2"] = True
             results["positives"].append("Поддерживается HTTP/2")
+            progress.update(task_id, description="Проверка поддержки HTTP/2... [green]Поддерживается[/green]", completed=1)
         else:
             # Если HTTP/2 не поддерживается, выполняем обычный запрос
             proc = subprocess.run(
@@ -95,17 +106,22 @@ def check_http2(domain, port):
                 text=True,
             )
             # Ищем строку со статусом ответа
+            http_version = None
             for line in proc.stdout.splitlines():
                 if line.startswith("HTTP/"):
                     http_version = line.split(" ", 1)[0].strip()
-                    results["negatives"].append(f"Не поддерживается HTTP/2 (используется {http_version})")
                     break
+            if http_version:
+                results["negatives"].append(f"Не поддерживается HTTP/2 (используется {http_version})")
+                progress.update(task_id, description=f"Проверка поддержки HTTP/2... [red]Не поддерживается[/red] ({http_version})", completed=1)
             else:
                 results["negatives"].append("Не удалось определить версию HTTP")
+                progress.update(task_id, description="Проверка поддержки HTTP/2... [red]Не удалось определить версию[/red]", completed=1)
     except Exception as e:
         results["negatives"].append(f"Ошибка при проверке HTTP/2: {e}")
+        progress.update(task_id, description="Проверка поддержки HTTP/2... [red]Ошибка[/red]", completed=1)
 
-def check_cdn(domain, port):
+def check_cdn(domain, port, progress, task_id):
     cdn_providers = {
         "cloudflare": "Cloudflare",
         "akamai": "Akamai",
@@ -130,23 +146,29 @@ def check_cdn(domain, port):
                 results["cdn"] = True
                 results["cdn_provider"] = provider
                 results["negatives"].append(f"Использование CDN: {provider}")
+                progress.update(task_id, description=f"Проверка наличия CDN... [red]Используется[/red] ({provider})", completed=1)
                 return
         results["positives"].append("CDN не используется")
+        progress.update(task_id, description="Проверка наличия CDN... [green]Не используется[/green]", completed=1)
     except Exception as e:
         results["negatives"].append(f"Ошибка при проверке CDN: {e}")
+        progress.update(task_id, description="Проверка наличия CDN... [red]Ошибка[/red]", completed=1)
 
-def check_redirect(domain, port):
+def check_redirect(domain, port, progress, task_id):
     try:
         response = requests.get(f"https://{domain}:{port}", timeout=5, allow_redirects=False)
         if 300 <= response.status_code < 400:
             results["redirect"] = True
             results["negatives"].append(f"Найдена переадресация: {response.headers.get('Location')}")
+            progress.update(task_id, description="Проверка переадресации... [red]Обнаружена[/red]", completed=1)
         else:
             results["positives"].append("Переадресация отсутствует")
+            progress.update(task_id, description="Проверка переадресации... [green]Отсутствует[/green]", completed=1)
     except Exception as e:
         results["negatives"].append(f"Ошибка при проверке переадресации: {e}")
+        progress.update(task_id, description="Проверка переадресации... [red]Ошибка[/red]", completed=1)
 
-def calculate_ping(domain):
+def calculate_ping(domain, progress, task_id):
     try:
         proc = subprocess.run(
             ["ping", "-c", "5", domain],
@@ -173,12 +195,16 @@ def calculate_ping(domain):
                 else:
                     results["rating"] = 1
                 results["positives"].append(f"Средний пинг: {results['ping']} мс (Рейтинг: {results['rating']}/5)")
+                progress.update(task_id, description=f"Вычисление пинга... [green]{results['ping']} мс[/green]", completed=1)
             else:
                 results["negatives"].append("Не удалось определить средний пинг")
+                progress.update(task_id, description="Вычисление пинга... [red]Не удалось определить[/red]", completed=1)
         else:
             results["negatives"].append("Не удалось выполнить пинг до хоста")
+            progress.update(task_id, description="Вычисление пинга... [red]Не удалось выполнить[/red]", completed=1)
     except Exception as e:
         results["negatives"].append(f"Ошибка при вычислении пинга: {e}")
+        progress.update(task_id, description="Вычисление пинга... [red]Ошибка[/red]", completed=1)
 
 def display_results():
     console.print("\n[bold cyan]===== Результаты проверки =====[/bold cyan]\n")
@@ -242,24 +268,24 @@ def main(domain_input):
 
     # Создаем прогресс-бар
     with Progress(
-        SpinnerColumn(finished_text="✅"),
+        SpinnerColumn(finished_text=""),
         TextColumn("{task.description}"),
     ) as progress:
-        tasks = []
-        tasks.append(progress.add_task("Проверка поддержки TLS 1.3...", total=1))
-        tasks.append(progress.add_task("Проверка поддержки HTTP/2...", total=1))
-        tasks.append(progress.add_task("Проверка наличия CDN...", total=1))
-        tasks.append(progress.add_task("Проверка переадресации...", total=1))
-        tasks.append(progress.add_task("Вычисление пинга...", total=1))
+        tasks = {}
+        tasks['tls'] = progress.add_task("Проверка поддержки TLS 1.3...", total=1)
+        tasks['http2'] = progress.add_task("Проверка поддержки HTTP/2...", total=1)
+        tasks['cdn'] = progress.add_task("Проверка наличия CDN...", total=1)
+        tasks['redirect'] = progress.add_task("Проверка переадресации...", total=1)
+        tasks['ping'] = progress.add_task("Вычисление пинга...", total=1)
 
         threads = []
 
         # Запускаем проверки в отдельных потоках
-        t_tls = threading.Thread(target=lambda: [check_tls(domain, port), progress.update(tasks[0], completed=1)])
-        t_http2 = threading.Thread(target=lambda: [check_http2(domain, port), progress.update(tasks[1], completed=1)])
-        t_cdn = threading.Thread(target=lambda: [check_cdn(domain, port), progress.update(tasks[2], completed=1)])
-        t_redirect = threading.Thread(target=lambda: [check_redirect(domain, port), progress.update(tasks[3], completed=1)])
-        t_ping = threading.Thread(target=lambda: [calculate_ping(domain), progress.update(tasks[4], completed=1)])
+        t_tls = threading.Thread(target=check_tls, args=(domain, port, progress, tasks['tls']))
+        t_http2 = threading.Thread(target=check_http2, args=(domain, port, progress, tasks['http2']))
+        t_cdn = threading.Thread(target=check_cdn, args=(domain, port, progress, tasks['cdn']))
+        t_redirect = threading.Thread(target=check_redirect, args=(domain, port, progress, tasks['redirect']))
+        t_ping = threading.Thread(target=calculate_ping, args=(domain, progress, tasks['ping']))
 
         threads.extend([t_tls, t_http2, t_cdn, t_redirect, t_ping])
 
