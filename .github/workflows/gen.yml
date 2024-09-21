@@ -6,107 +6,146 @@ on:
     - cron: "0 * * * *"  # Запуск ежечасно
   push:
     branches:
-      - main
-    # Исключение пушей, сделанных GitHub Actions
-    paths-ignore:
-      - .github/workflows/*.yml
+      - main  # Запуск при пуше в ветку main
 
 jobs:
-  build_and_publish:
+  build_rules_list:
     runs-on: ubuntu-latest
     steps:
-      # Шаг 1: Проверка основного репозитория
-      - name: Checkout main repository
+      - name: Generate domain_custom.list file
+        run: |
+          curl -sSL https://raw.githubusercontent.com/DigneZzZ/dignezzz.github.io/main/shadowrocket/custom.list \
+          | sed -E 's/^\+\./DOMAIN-SUFFIX,/; s/^[^D]/DOMAIN-SUFFIX,&/' > domain_custom.list
+          
+      - name: Generate domain_antifilter.list file
+        run: |
+          curl -sSL https://community.antifilter.download/list/domains.lst \
+          | sed -E 's/^\+\./DOMAIN-SUFFIX,/; s/^[^D]/DOMAIN-SUFFIX,&/' > domain_antifilter.list
+
+      - name: Generate geoip_antifilter.list file
+        run: |
+          curl -sSL https://community.antifilter.download/list/community.lst | sed 's/^/IP-CIDR,/' > geoip_antifilter.list       
+
+      - name: Move files to rules directory
+        run: |
+          mkdir -p rules.d
+          cp *.list ./rules.d/
+
+      - name: Upload rule list artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rules
+          path: ./rules.d/
+
+  build_Shadowrocket_conf_file:
+    runs-on: ubuntu-latest
+    needs: build_rules_list
+    steps:
+      - name: Creating Folders
+        run: |
+          mkdir -p conf.d
+          
+      - name: Get General.txt from your repository
         uses: actions/checkout@v4
         with:
           repository: DigneZzZ/dignezzz.github.io
           ref: main
+          sparse-checkout: shadowrocket/General.txt
+          path: conf.d
           token: ${{ secrets.ACCESS_TOKEN }}
-          path: main_repo
-
-      # Шаг 2: Генерация domain_custom.list
-      - name: Generate domain_custom.list file
+      
+      - name: Concatenate rule configuration files
         run: |
-          curl -sSL https://raw.githubusercontent.com/DigneZzZ/dignezzz.github.io/main/shadowrocket/custom.list \
-          | sed -E 's/^\+\./DOMAIN-SUFFIX,/; s/^[^D]/DOMAIN-SUFFIX,&/' > main_repo/shadowrocket/rules/domain_custom.list
-
-      # Шаг 3: Генерация domain_antifilter.list
-      - name: Generate domain_antifilter.list file
-        run: |
-          curl -sSL https://community.antifilter.download/list/domains.lst \
-          | sed -E 's/^\+\./DOMAIN-SUFFIX,/; s/^[^D]/DOMAIN-SUFFIX,&/' > main_repo/shadowrocket/rules/domain_antifilter.list
-
-      # Шаг 4: Генерация geoip_antifilter.list
-      - name: Generate geoip_antifilter.list file
-        run: |
-          curl -sSL https://community.antifilter.download/list/community.lst | sed 's/^/IP-CIDR,/' > main_repo/shadowrocket/rules/geoip_antifilter.list
-
-      # Шаг 5: Обновление General.txt с правилами
-      - name: Update General.txt with new rules
-        run: |
-          cat <<EOF >> main_repo/shadowrocket/General.txt
+          cat <<EOF >> ./conf.d/General.txt
           [Rule]
-          RULE-SET,https://raw.githubusercontent.com/DigneZzZ/dignezzz.github.io/main/shadowrocket/rules/domain_custom.list,PROXY
-          RULE-SET,https://raw.githubusercontent.com/DigneZzZ/dignezzz.github.io/main/shadowrocket/rules/domain_antifilter.list,PROXY
-          RULE-SET,https://raw.githubusercontent.com/DigneZzZ/dignezzz.github.io/main/shadowrocket/rules/geoip_antifilter.list,PROXY,no-resolve
+          RULE-SET,https://raw.githubusercontent.com/DigneZzZ/dignezzz.github.io/release/rules/domain_custom.list,PROXY
+          RULE-SET,https://raw.githubusercontent.com/DigneZzZ/dignezzz.github.io/release/rules/domain_antifilter.list,PROXY
+          RULE-SET,https://raw.githubusercontent.com/DigneZzZ/dignezzz.github.io/release/rules/geoip_antifilter.list,PROXY,no-resolve
           FINAL,DIRECT
+          
           EOF
+          
+      # Закомментированный шаг, если требуется дальнейшая конфигурация
+      # - name: Generate HTTPS decrypted configuration file
+      #   run: |
+      #     sed -i 's/hostname = /hostname = *instagram.com,/' MITM.txt
+      #     cp MITM.txt ./conf.d
 
-      # Шаг 6: Создание конфигурационного файла sr_ru_public_lists.conf
-      - name: Create sr_ru_public_lists.conf
+      - name: Concatenate All configuration file
         run: |
-          cat main_repo/shadowrocket/General.txt > main_repo/shadowrocket/sr_ru_public_lists.conf
-          sed -i "1s/^/# @DigneZzZ, built on $(TZ=\"Europe/Moscow\" date)\n/" main_repo/shadowrocket/sr_ru_public_lists.conf
+          cat ./conf.d/*.txt > ./conf.d/sr_ru_public_lists.conf
+          sed -i "1s/^/# @DigneZzZ, built on $(TZ=\"Europe/Moscow\" date)\n/" ./conf.d/sr_ru_public_lists.conf
 
-      # Шаг 7: Настройка Git пользователя
-      - name: Configure Git user
-        run: |
-          git config --local user.name "${{ secrets.USER_NAME }}"
-          git config --local user.email "${{ secrets.USER_EMAIL }}"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: conf
+          path: ./conf.d/sr_ru_public_lists.conf
+          retention-days: 1
 
-      # Шаг 8: Добавление и коммит изменений
-      - name: Commit changes
+  publish:
+    runs-on: ubuntu-latest
+    needs: [build_rules_list, build_Shadowrocket_conf_file]
+    steps:
+      - name: Configure variable names
         run: |
-          git add shadowrocket/rules/*.list shadowrocket/sr_ru_public_lists.conf
-          git commit -m "Update Shadowrocket rules: $(date +"%Y-%m-%d %H:%M:%S")"
-
-      # Шаг 9: Пуш изменений в основную ветку
-      - name: Push changes
+          echo "RELEASE_NAME=Built on $(TZ=\"Europe/Moscow\" date +%Y%m%d%H%M)" >> $GITHUB_ENV
+          echo "TAG_NAME=$(TZ=\"Europe/Moscow\" date +%Y%m%d%H%M)" >> $GITHUB_ENV
+  
+      - name: Download artifact 
+        uses: actions/download-artifact@v4
+        with:
+          name: rules
+          path: ./rules
+  
+      - name: Download configuration artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: conf
+          path: ./conf.d
+  
+      - name: Move files to shadowrocket directory
         run: |
+          mkdir -p ./shadowrocket
+          cp ./rules/* ./shadowrocket/
+          cp ./conf.d/sr_ru_public_lists.conf ./shadowrocket/
+  
+      - name: Commit and push changes to main branch
+        run: |
+          git config --global user.name "${{ secrets.USER_NAME }}"
+          git config --global user.email "${{ secrets.USER_EMAIL }}"
+          git checkout main
+          git add ./shadowrocket/*
+          git commit -m "Update Shadowrocket rules and configuration: ${{ env.RELEASE_NAME }}"
           git push origin main
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
 
-      # Шаг 10: Очистка кеша jsdelivr CDN
-      - name: Purge jsdelivr CDN
-        run: |
-          for file in shadowrocket/rules/*.list shadowrocket/sr_ru_public_lists.conf; do
-            filename=$(basename "$file")
-            curl -i "https://purge.jsdelivr.net/gh/${{ github.repository }}/shadowrocket/${filename}"
-          done
-
+        
   Delete_Historical_Data:
     runs-on: ubuntu-latest
-    needs: build_and_publish
+    needs: publish
     steps:
-      - name: Delete old artifacts
-        uses: geekyeggo/delete-artifact@v5
-        with:
-          name: |
-              rules
-              conf
+        - name: Delete old artifacts
+          uses: geekyeggo/delete-artifact@v5
+          with:
+            name: |
+                rules
+                conf
 
-      - name: Delete old tags and releases
-        uses: dev-drprasad/delete-older-releases@v0.3.4
-        with:
-          keep_latest: 3
-          delete_expired_data: 2
-          delete_tags: true
-        env:
-            GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+        - name: Delete old tags and releases
+          uses: dev-drprasad/delete-older-releases@v0.3.4
+          with:
+            keep_latest: 3
+            delete_expired_data: 2
+            delete_tags: true
+          env:
+              GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
 
-      - name: Delete old workflow runs
-        uses: Mattraks/delete-workflow-runs@v2
-        with:
-          token: ${{ secrets.ACCESS_TOKEN }}
-          repository: ${{ github.repository }}
-          retain_days: 2
-          keep_minimum_runs: 3
+        - name: Delete old workflow runs
+          uses: Mattraks/delete-workflow-runs@v2
+          with:
+            token: ${{ secrets.ACCESS_TOKEN }}
+            repository: ${{ github.repository }}
+            retain_days: 2
+            keep_minimum_runs: 3
