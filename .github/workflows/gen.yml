@@ -49,13 +49,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: DigneZzZ/dignezzz.github.io
-          ref: 'main'
-          token: ${{ secrets.ACCESS_TOKEN }}
-          sparse-checkout: |
-            shadowrocket/General.txt
-          sparse-checkout-cone-mode: false
+          ref: main
+          sparse-checkout: shadowrocket/General.txt
           path: conf.d
-
+          token: ${{ secrets.ACCESS_TOKEN }}
+      
       - name: Concatenate rule configuration files
         run: |
           cat <<EOF >> ./conf.d/General.txt
