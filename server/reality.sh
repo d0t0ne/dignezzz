@@ -27,58 +27,67 @@ except ImportError as e:
 EOF
 
         if [ $? -eq 0 ]; then
-
             python3 <(wget -qO- "$py_script") "$domain"
         else
-
             bash <(wget -qO- "$bash_script") "$domain"
         fi
     else
-
         bash <(wget -qO- "$bash_script") "$domain"
     fi
 }
-
-# Check if a domain argument is provided
-if [ -z "$1" ]; then
-    echo "Please provide a domain as an argument."
-    echo "Usage: $0 <domain> [port]"
-    exit 1
-fi
-
-domain=$1
-domain_port=$1
-
-# Check if a port argument is provided
-if [ ! -z "$2" ]; then
-    domain_port="$1:$2"
-fi
 
 # ANSI color codes for highlighting
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m' # No color
 
+# Prompt user to enter the domain
+read -p "Please enter the domain to check: " input_domain
+
+# Validate the entered domain
+if [ -z "$input_domain" ]; then
+    echo -e "${RED}Error: No domain entered.${NC}"
+    echo "Usage: Run the script and enter the domain when prompted."
+    exit 1
+fi
+
+domain="$input_domain"
+domain_port="$input_domain"
+
+# Optionally, prompt for port
+read -p "Do you want to specify a port? (y/n): " specify_port
+
+if [[ "$specify_port" =~ ^[Yy]$ ]]; then
+    read -p "Enter the port number: " port
+    # Validate the port number
+    if [[ ! "$port" =~ ^[0-9]+$ ]] || [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
+        echo -e "${RED}Invalid port number. Using default domain without port.${NC}"
+    else
+        domain_port="${domain}:${port}"
+    fi
+fi
+
 # Menu for user selection
-echo -e "The domain being checked is: ${GREEN}$domain_port${NC}"
+echo -e "\nThe domain being checked is: ${GREEN}$domain_port${NC}"
 echo -e "Select an option to check:"
 echo -e "1. Check host ${RED}'$domain'${NC} for use as ${GREEN}Reality ServerName${NC} (domain only)"
 echo -e "2. Check host ${RED}'$domain_port'${NC} for use as ${GREEN}Reality Dest${NC}"
 
+# Prompt for user choice
 read -p "Enter your choice (1 or 2): " choice
 
+# Handle user choice
 case $choice in
     1)
-        echo -e "You selected: Checking host ${RED}'$domain'${NC} for Reality ServerName${NC}"
+        echo -e "\nYou selected: Checking host ${RED}'$domain'${NC} for Reality ServerName${NC}"
         check_python_and_run "https://dignezzz.github.io/server/sni.py" "https://dignezzz.github.io/server/sni.sh" "$domain"
         ;;
     2)
-        echo -e "You selected: Checking host ${RED}'$domain_port'${NC} for ${GREEN}Reality Dest${NC}"
+        echo -e "\nYou selected: Checking host ${RED}'$domain_port'${NC} for ${GREEN}Reality Dest${NC}"
         check_python_and_run "https://dignezzz.github.io/server/dest.py" "https://dignezzz.github.io/server/dest.sh" "$domain_port"
         ;;
     *)
-        echo "Invalid choice. Please enter 1 or 2."
+        echo -e "${RED}Invalid choice. Please enter 1 or 2.${NC}"
+        exit 1
         ;;
 esac
-
-
