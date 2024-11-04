@@ -165,7 +165,7 @@ services:
       - mysql
 
   mysql:
-    image: mysql:latest
+    image: mysql:8.3
     restart: always
     env_file: .env
     network_mode: host
