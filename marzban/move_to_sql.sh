@@ -162,18 +162,37 @@ services:
     volumes:
       - /var/lib/marzban:/var/lib/marzban
     depends_on:
-      - mysql
+      mariadb:
+        condition: service_healthy
 
-  mysql:
-    image: mysql:8.3
-    restart: always
+  mariadb:
+    image: mariadb:lts
     env_file: .env
     network_mode: host
-    command: --bind-address=127.0.0.1 --mysqlx-bind-address=127.0.0.1 --disable-log-bin
+    restart: always
     environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_HOST: '%'
       MYSQL_DATABASE: marzban
+      MYSQL_USER: marzban
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    command:
+      - --bind-address=127.0.0.1
+      - --character_set_server=utf8mb4
+      - --collation_server=utf8mb4_unicode_ci
+      - --host-cache-size=0
+      - --innodb-open-files=1024
+      - --innodb-buffer-pool-size=268435456
+      - --binlog_expire_logs_seconds=5184000 # 60 days
     volumes:
       - /var/lib/marzban/mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 10s
+      start_interval: 3s
+      interval: 10s
+      timeout: 5s
+      retries: 3
 EOF
 
     if [ "$INSTALL_PHPMYADMIN" = "yes" ]; then
@@ -189,7 +208,7 @@ EOF
       APACHE_PORT: ${PHPMYADMIN_PORT}
       UPLOAD_LIMIT: 1024M
     depends_on:
-      - mysql
+      - mariadb
 EOF
     fi
 
@@ -215,24 +234,36 @@ EOF
     check_success "Marzban запущен." "Не удалось запустить Marzban."
 }
 
-# Функция миграции базы данных
 migrate_database() {
     if [ ! -f /var/lib/marzban/db.sqlite3 ]; then
         error "Файл db.sqlite3 не найден."
         exit 1
     fi
 
+    # Создание дампа SQLite
     sqlite3 /var/lib/marzban/db.sqlite3 '.dump --data-only' | sed "s/INSERT INTO \([^ ]*\)/REPLACE INTO \`\1\`/g" > /tmp/dump.sql
     check_success "Дамп SQLite создан." "Не удалось создать дамп SQLite."
 
+    # Проверка статуса контейнера MySQL
+    print "Проверка запуска контейнера MySQL..."
+    until docker compose -f "$DOCKER_COMPOSE_PATH" ps mysql | grep -q "Up"; do
+        print "Ожидание запуска контейнера MySQL..."
+        sleep 3
+    done
+    success "Контейнер MySQL успешно запущен."
+
+    # Копирование дампа в контейнер MySQL
     docker compose -f "$DOCKER_COMPOSE_PATH" cp /tmp/dump.sql mysql:/dump.sql
     check_success "Дамп скопирован в контейнер MySQL." "Не удалось скопировать дамп в контейнер MySQL."
 
+    # Выполнение команды для восстановления дампа в MySQL
     docker compose -f "$DOCKER_COMPOSE_PATH" exec mysql mysql -u root -p"${DB_PASSWORD}" -h 127.0.0.1 marzban -e "SET FOREIGN_KEY_CHECKS = 0; SET NAMES utf8mb4; SOURCE /dump.sql;"
     check_success "Данные перенесены в MySQL." "Не удалось перенести данные в MySQL."
 
+    # Удаление временного дампа
     rm /tmp/dump.sql
 
+    # Перезапуск сервиса Marzban после миграции
     docker compose -f "$DOCKER_COMPOSE_PATH" restart marzban
     check_success "Marzban перезапущен." "Не удалось перезапустить Marzban."
 
