@@ -3,6 +3,7 @@
 
 | Script Name | Command |
 |-------------|---------|
+| move_to_db.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/move_to_db.sh)` |
 | backup2.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/backup2.sh)` |
 | backup2e.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/backup2e.sh)` |
 | move_to_maraiadb.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/move_to_maraiadb.sh)` |
@@ -28,4 +29,4 @@
 | ssh-port.sh | `bash <(wget -qO- https://dignezzz.github.io/server/ssh-port.sh)` |
 
 
-_Last updated at Mon Nov 11 14:30:11 UTC 2024_ 
+_Last updated at Mon Nov 11 14:32:39 UTC 2024_ 
