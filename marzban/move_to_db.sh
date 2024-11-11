@@ -191,6 +191,13 @@ services:
       - --collation_server=utf8mb4_unicode_ci
     volumes:
       - /var/lib/marzban/mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 10s
+      start_interval: 3s
+      interval: 10s
+      timeout: 5s
+      retries: 3
 EOF
 }
 
@@ -227,6 +234,12 @@ services:
       - --collation_server=utf8mb4_unicode_ci
     volumes:
       - /var/lib/marzban/mysql:/var/lib/mysql
+    healthcheck:
+      test: mysqladmin ping -h 127.0.0.1 -u marzban --password=password
+      start_period: 5s
+      interval: 5s
+      timeout: 5s
+      retries: 55
 EOF
 }
 
