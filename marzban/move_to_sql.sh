@@ -222,7 +222,7 @@ EOF
 
     docker compose -f "$DOCKER_COMPOSE_PATH" down || true
 
-    docker compose -f "$DOCKER_COMPOSE_PATH" up -d mysql
+    docker compose -f "$DOCKER_COMPOSE_PATH" up -d mariadb
     check_success "MySQL запущен." "Не удалось запустить MySQL."
 
     if [ "$INSTALL_PHPMYADMIN" = "yes" ]; then
