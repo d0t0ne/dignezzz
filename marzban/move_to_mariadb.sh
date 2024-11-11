@@ -257,7 +257,7 @@ migrate_database() {
     check_success "Дамп скопирован в контейнер MariaDB." "Не удалось скопировать дамп в контейнер MariaDB."
 
     # Выполнение команды для восстановления дампа в MariaDB
-    docker compose -f "$DOCKER_COMPOSE_PATH" exec mariadb mysql -u root -p"${DB_PASSWORD}" -h 127.0.0.1 marzban -e "SET FOREIGN_KEY_CHECKS = 0; SET NAMES utf8mb4; SOURCE /dump.sql;"
+    docker compose -f "$DOCKER_COMPOSE_PATH" exec mariadb mariadb -u root -p"${DB_PASSWORD}" -h 127.0.0.1 marzban -e "SET FOREIGN_KEY_CHECKS = 0; SET NAMES utf8mb4; SOURCE /dump.sql;"
     check_success "Данные перенесены в MariaDB." "Не удалось перенести данные в MariaDB."
 
     # Удаление временного дампа
