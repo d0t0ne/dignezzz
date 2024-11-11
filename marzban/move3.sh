@@ -254,7 +254,7 @@ migrate_database() {
 
     # Проверка создания таблиц
     docker compose -f "$DOCKER_COMPOSE_PATH" cp /tmp/dump.sql $DB_ENGINE:/dump.sql
-    docker compose -f "$DOCKER_COMPOSE_PATH" exec $DB_ENGINE mysql -u root -p"${DB_PASSWORD}" -h 127.0.0.1 marzban -e "SET FOREIGN_KEY_CHECKS = 0; SET NAMES utf8mb4; SOURCE /dump.sql;"
+    docker compose -f "$DOCKER_COMPOSE_PATH" exec $DB_ENGINE $DB_ENGINE -u root -p"${DB_PASSWORD}" -h 127.0.0.1 marzban -e "SET FOREIGN_KEY_CHECKS = 0; SET NAMES utf8mb4; SOURCE /dump.sql;"
     check_success "Данные успешно восстановлены в базе данных." "Не удалось восстановить данные."
 
     # Удаление временного дампа
