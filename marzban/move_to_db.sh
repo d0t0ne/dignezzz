@@ -110,35 +110,6 @@ get_user_input() {
             break
         fi
     done
-
-    while true; do
-        input "Хотите установить phpMyAdmin? (yes/no) [yes]" INSTALL_PHPMYADMIN
-        INSTALL_PHPMYADMIN=${INSTALL_PHPMYADMIN:-yes}
-
-        if [ "$INSTALL_PHPMYADMIN" = "yes" ]; then
-            while true; do
-                input "Введите порт для phpMyAdmin [8010]" PHPMYADMIN_PORT
-                PHPMYADMIN_PORT=${PHPMYADMIN_PORT:-8010}
-
-                if ! [[ "$PHPMYADMIN_PORT" =~ ^[0-9]+$ ]]; then
-                    error "Недействительный порт."
-                    continue
-                fi
-
-                if lsof -i :$PHPMYADMIN_PORT > /dev/null 2>&1; then
-                    error "Порт $PHPMYADMIN_PORT уже используется."
-                    continue
-                fi
-
-                break
-            done
-            break
-        elif [ "$INSTALL_PHPMYADMIN" = "no" ]; then
-            break
-        else
-            error "Пожалуйста, введите 'yes' или 'no'."
-        fi
-    done
 }
 
 # Функция резервного копирования
@@ -192,9 +163,8 @@ services:
     volumes:
       - /var/lib/marzban/mysql:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      test: ["CMD", "mysqladmin", "ping", "-u", "marzban", "-p${DB_PASSWORD}"]
       start_period: 10s
-      start_interval: 3s
       interval: 10s
       timeout: 5s
       retries: 3
@@ -235,11 +205,11 @@ services:
     volumes:
       - /var/lib/marzban/mysql:/var/lib/mysql
     healthcheck:
-      test: mysqladmin ping -h 127.0.0.1 -u marzban --password=password
-      start_period: 5s
-      interval: 5s
+      test: ["CMD", "mysqladmin", "ping", "-u", "marzban", "-p${DB_PASSWORD}"]
+      start_period: 10s
+      interval: 10s
       timeout: 5s
-      retries: 55
+      retries: 3
 EOF
 }
 
@@ -250,57 +220,43 @@ migrate_database() {
         exit 1
     fi
 
-    # Создание полного дампа SQLite (схема + данные)
-    sqlite3 /var/lib/marzban/db.sqlite3 '.dump' > /tmp/dump.sql
-    check_success "Дамп SQLite создан." "Не удалось создать дамп SQLite."
+    # Создание дампа только данных из SQLite
+    sqlite3 /var/lib/marzban/db.sqlite3 '.dump --data-only' | sed "s/INSERT INTO \([^ ]*\)/REPLACE INTO \`\1\`/g" > /tmp/dump.sql
+    check_success "Дамп данных SQLite создан." "Не удалось создать дамп SQLite."
 
-    # Проверка статуса контейнера базы данных
-    print "Проверка запуска контейнера базы данных..."
-    until docker compose -f "$DOCKER_COMPOSE_PATH" ps $DB_ENGINE | grep -q "Up"; do
-        print "Ожидание запуска контейнера базы данных..."
-        sleep 3
-    done
-    success "Контейнер базы данных успешно запущен."
+    # Запуск Marzban и базы данных для создания таблиц
+    docker compose -f "$DOCKER_COMPOSE_PATH" down || true
+    docker compose -f "$DOCKER_COMPOSE_PATH" up -d $DB_ENGINE marzban
+
+    # Ожидание для создания таблиц Marzban
+    print "Ожидание 10 секунд для создания таблиц в базе данных..."
+    sleep 10
 
     # Копирование дампа в контейнер базы данных
     docker compose -f "$DOCKER_COMPOSE_PATH" cp /tmp/dump.sql $DB_ENGINE:/dump.sql
-    check_success "Дамп скопирован в контейнер базы данных." "Не удалось скопировать дамп в контейнер базы данных."
+    check_success "Дамп данных скопирован в контейнер базы данных." "Не удалось скопировать дамп в контейнер базы данных."
 
-    # Определяем хост для подключения
+    # Определяем команду для восстановления дампа
     if [ "$DB_ENGINE" = "mariadb" ]; then
-        DB_HOST="mariadb"
         DB_CMD="mariadb"
     else
-        DB_HOST="mysql"
         DB_CMD="mysql"
     fi
 
-    # Выполнение команды для восстановления дампа в MariaDB или MySQL
-    docker compose -f "$DOCKER_COMPOSE_PATH" exec $DB_ENGINE $DB_CMD -u root -p"${DB_PASSWORD}" -h "$DB_HOST" marzban -e "SET FOREIGN_KEY_CHECKS = 0; SET NAMES utf8mb4; SOURCE /dump.sql;"
-    check_success "Данные перенесены в базу данных." "Не удалось перенести данные в базу данных."
+    # Восстановление данных в базе
+    docker compose -f "$DOCKER_COMPOSE_PATH" exec $DB_ENGINE $DB_CMD -u root -p"${DB_PASSWORD}" -h 127.0.0.1 marzban -e "SET FOREIGN_KEY_CHECKS = 0; SET NAMES utf8mb4; SOURCE /dump.sql;"
+    check_success "Данные успешно восстановлены в базе данных." "Не удалось восстановить данные."
 
     # Удаление временного дампа
     rm /tmp/dump.sql
 
-    # Перезапуск сервиса Marzban после миграции
+    # Перезапуск Marzban
     docker compose -f "$DOCKER_COMPOSE_PATH" restart marzban
-    check_success "Marzban перезапущен." "Не удалось перезапустить Marzban."
-
-    if [ "$INSTALL_PHPMYADMIN" = "yes" ]; then
-        print "Marzban работает с базой данных и phpMyAdmin."
-        success "Доступ к phpMyAdmin: http://<IP>:${PHPMYADMIN_PORT}"
-        success "Логин: root"
-        success "Пароль: ваш указанный пароль"
-    else
-        print "Marzban работает с базой данных."
-    fi
+    check_success "Marzban успешно перезапущен." "Не удалось перезапустить Marzban."
 
     success "Миграция завершена."
     confirm
 }
-
-
-
 
 # Основное меню
 main_menu() {
@@ -323,8 +279,6 @@ main_menu() {
                 else
                     setup_mysql
                 fi
-                docker compose -f "$DOCKER_COMPOSE_PATH" down || true
-                docker compose -f "$DOCKER_COMPOSE_PATH" up -d $DB_ENGINE
                 migrate_database
                 ;;
             0)
