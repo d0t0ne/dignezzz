@@ -268,9 +268,9 @@ migrate_database() {
 
     # Выполнение команды для восстановления дампа в MariaDB или MySQL
     if [ "$DB_ENGINE" = "mariadb" ]; then
-        docker compose -f "$DOCKER_COMPOSE_PATH" exec mariadb mariadb -u root -p"${DB_PASSWORD}" marzban -e "SET FOREIGN_KEY_CHECKS = 0; SET NAMES utf8mb4; SOURCE /dump.sql;"
+        docker compose -f "$DOCKER_COMPOSE_PATH" exec mariadb mariadb -u root -p"${DB_PASSWORD}" -h 127.0.0.1 marzban -e "SET FOREIGN_KEY_CHECKS = 0; SET NAMES utf8mb4; SOURCE /dump.sql;"
     else
-        docker compose -f "$DOCKER_COMPOSE_PATH" exec mysql mysql -u root -p"${DB_PASSWORD}" marzban -e "SET FOREIGN_KEY_CHECKS = 0; SET NAMES utf8mb4; SOURCE /dump.sql;"
+        docker compose -f "$DOCKER_COMPOSE_PATH" exec mysql mysql -u root -p"${DB_PASSWORD}" -h 127.0.0.1 marzban -e "SET FOREIGN_KEY_CHECKS = 0; SET NAMES utf8mb4; SOURCE /dump.sql;"
     fi
     check_success "Данные перенесены в базу данных." "Не удалось перенести данные в базу данных."
 
@@ -293,6 +293,7 @@ migrate_database() {
     success "Миграция завершена."
     confirm
 }
+
 
 # Основное меню
 main_menu() {
