@@ -268,10 +268,10 @@ migrate_database() {
 
     # Определяем хост для подключения
     if [ "$DB_ENGINE" = "mariadb" ]; then
-        DB_HOST="localhost"
+        DB_HOST="mariadb"
         DB_CMD="mariadb"
     else
-        DB_HOST="localhost"
+        DB_HOST="mysql"
         DB_CMD="mysql"
     fi
 
@@ -298,6 +298,7 @@ migrate_database() {
     success "Миграция завершена."
     confirm
 }
+
 
 
 
