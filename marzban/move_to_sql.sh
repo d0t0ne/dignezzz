@@ -253,7 +253,7 @@ migrate_database() {
     success "Контейнер MySQL успешно запущен."
 
     # Копирование дампа в контейнер MySQL
-    docker compose -f "$DOCKER_COMPOSE_PATH" cp /tmp/dump.sql mysql:/dump.sql
+    docker compose -f "$DOCKER_COMPOSE_PATH" cp /tmp/dump.sql mariadb:/dump.sql
     check_success "Дамп скопирован в контейнер MySQL." "Не удалось скопировать дамп в контейнер MySQL."
 
     # Выполнение команды для восстановления дампа в MySQL
