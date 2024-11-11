@@ -8,6 +8,7 @@
 | move2.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/move2.sh)` |
 | backup2e.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/backup2e.sh)` |
 | move_to_maraiadb.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/move_to_maraiadb.sh)` |
+| move3.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/move3.sh)` |
 | core_change.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/core_change.sh)` |
 | ufw_main.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/ufw_main.sh)` |
 | backup.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/backup.sh)` |
@@ -30,4 +31,4 @@
 | ssh-port.sh | `bash <(wget -qO- https://dignezzz.github.io/server/ssh-port.sh)` |
 
 
-_Last updated at Mon Nov 11 15:36:04 UTC 2024_ 
+_Last updated at Mon Nov 11 15:44:03 UTC 2024_ 
