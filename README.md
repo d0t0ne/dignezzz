@@ -3,12 +3,13 @@
 
 | Script Name | Command |
 |-------------|---------|
-| move_to_mariadb.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/move_to_mariadb.sh)` |
 | backup2.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/backup2.sh)` |
 | backup2e.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/backup2e.sh)` |
+| move_to_maraiadb.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/move_to_maraiadb.sh)` |
 | core_change.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/core_change.sh)` |
 | ufw_main.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/ufw_main.sh)` |
 | backup.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/backup.sh)` |
+| move_to_mariadb2.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/move_to_mariadb2.sh)` |
 | ufw_node.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/ufw_node.sh)` |
 | move_to_sql.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/move_to_sql.sh)` |
 
@@ -27,4 +28,4 @@
 | ssh-port.sh | `bash <(wget -qO- https://dignezzz.github.io/server/ssh-port.sh)` |
 
 
-_Last updated at Mon Nov 11 14:22:59 UTC 2024_ 
+_Last updated at Mon Nov 11 14:30:11 UTC 2024_ 
