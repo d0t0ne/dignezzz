@@ -266,12 +266,17 @@ migrate_database() {
     docker compose -f "$DOCKER_COMPOSE_PATH" cp /tmp/dump.sql $DB_ENGINE:/dump.sql
     check_success "Дамп скопирован в контейнер базы данных." "Не удалось скопировать дамп в контейнер базы данных."
 
-    # Выполнение команды для восстановления дампа в MariaDB или MySQL
+    # Определяем хост для подключения
     if [ "$DB_ENGINE" = "mariadb" ]; then
-        docker compose -f "$DOCKER_COMPOSE_PATH" exec mariadb mariadb -u root -p"${DB_PASSWORD}" -h 127.0.0.1 marzban -e "SET FOREIGN_KEY_CHECKS = 0; SET NAMES utf8mb4; SOURCE /dump.sql;"
+        DB_HOST="localhost"
+        DB_CMD="mariadb"
     else
-        docker compose -f "$DOCKER_COMPOSE_PATH" exec mysql mysql -u root -p"${DB_PASSWORD}" -h 127.0.0.1 marzban -e "SET FOREIGN_KEY_CHECKS = 0; SET NAMES utf8mb4; SOURCE /dump.sql;"
+        DB_HOST="localhost"
+        DB_CMD="mysql"
     fi
+
+    # Выполнение команды для восстановления дампа в MariaDB или MySQL
+    docker compose -f "$DOCKER_COMPOSE_PATH" exec $DB_ENGINE $DB_CMD -u root -p"${DB_PASSWORD}" -h "$DB_HOST" marzban -e "SET FOREIGN_KEY_CHECKS = 0; SET NAMES utf8mb4; SOURCE /dump.sql;"
     check_success "Данные перенесены в базу данных." "Не удалось перенести данные в базу данных."
 
     # Удаление временного дампа
@@ -293,6 +298,7 @@ migrate_database() {
     success "Миграция завершена."
     confirm
 }
+
 
 
 # Основное меню
