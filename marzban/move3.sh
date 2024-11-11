@@ -245,7 +245,7 @@ migrate_database() {
     check_success "Дамп данных SQLite создан." "Не удалось создать дамп SQLite."
 
     # Запуск контейнеров
-    docker compose -f "$DOCKER_COMPOSE_PATH" down || true
+    docker compose -f "$DOCKER_COMPOSE_PATH" down --remove-orphans|| true
     docker compose -f "$DOCKER_COMPOSE_PATH" up -d $DB_ENGINE marzban
 
     # Ожидание для создания таблиц в базе данных
