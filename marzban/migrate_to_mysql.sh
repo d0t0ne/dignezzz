@@ -55,8 +55,8 @@ install_dependencies() {
 select_database() {
     while true; do
         print "Select the target database for migration:"
-        print "1. MariaDB"
-        print "2. MySQL 8.3"
+        print "1. MariaDB LTS"
+        print "2. MySQL LTS"
         input "Enter your choice" DB_CHOICE
         case $DB_CHOICE in
             1)
@@ -161,13 +161,29 @@ services:
       MYSQL_USER: marzban
       MYSQL_PASSWORD: ${DB_PASSWORD}
     command:
-      - --bind-address=127.0.0.1
-      - --character_set_server=utf8mb4
-      - --collation_server=utf8mb4_unicode_ci
+      - --bind-address=127.0.0.1                  # Restricts access to localhost for increased security
+      - --character_set_server=utf8mb4            # Sets UTF-8 character set for full Unicode support
+      - --collation_server=utf8mb4_unicode_ci     # Defines collation for Unicode
+      - --host-cache-size=0                       # Disables host cache to prevent DNS issues
+      - --innodb-open-files=1024                  # Sets the limit for InnoDB open files
+      - --innodb-buffer-pool-size=256M            # Allocates buffer pool size for InnoDB
+      - --binlog_expire_logs_seconds=1209600      # Sets binary log expiration to 14 days (2 weeks)
+      - --innodb-log-file-size=64M                # Sets InnoDB log file size to balance log retention and performance
+      - --innodb-log-files-in-group=2             # Uses two log files to balance recovery and disk I/O
+      - --innodb-doublewrite=0                    # Disables doublewrite buffer (reduces disk I/O; may increase data loss risk)
+      - --general_log=0                           # Disables general query log to reduce disk usage
+      - --slow_query_log=1                        # Enables slow query log for identifying performance issues
+      - --slow_query_log_file=/var/lib/mysql/slow.log # Logs slow queries for troubleshooting
+      - --long_query_time=2                       # Defines slow query threshold as 2 seconds
     volumes:
       - /var/lib/marzban/mysql:/var/lib/mysql
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 10s
+      start_interval: 3s
+      interval: 10s
+      timeout: 5s
+      retries: 3
 EOF
 }
 
@@ -186,7 +202,7 @@ services:
         condition: service_healthy
 
   mysql:
-    image: mysql:8.3
+    image: mysql:lts
     env_file: .env
     network_mode: host
     restart: always
@@ -197,12 +213,29 @@ services:
       MYSQL_USER: marzban
       MYSQL_PASSWORD: ${DB_PASSWORD}
     command:
-      - --bind-address=127.0.0.1
-      - --character_set_server=utf8mb4
+      - --mysqlx=OFF                             # Disables MySQL X Plugin to save resources if X Protocol isn't used
+      - --bind-address=127.0.0.1                  # Restricts access to localhost for increased security
+      - --character_set_server=utf8mb4            # Sets UTF-8 character set for full Unicode support
+      - --collation_server=utf8mb4_unicode_ci     # Defines collation for Unicode
+      - --log-bin=mysql-bin                       # Enables binary logging for point-in-time recovery
+      - --binlog_expire_logs_seconds=1209600      # Sets binary log expiration to 14 days
+      - --host-cache-size=0                       # Disables host cache to prevent DNS issues
+      - --innodb-open-files=1024                  # Sets the limit for InnoDB open files
+      - --innodb-buffer-pool-size=256M            # Allocates buffer pool size for InnoDB
+      - --innodb-log-file-size=64M                # Sets InnoDB log file size to balance log retention and performance
+      - --innodb-log-files-in-group=2             # Uses two log files to balance recovery and disk I/O
+      - --general_log=0                           # Disables general query log for lower disk usage
+      - --slow_query_log=1                        # Enables slow query log for performance analysis
+      - --slow_query_log_file=/var/lib/mysql/slow.log # Logs slow queries for troubleshooting
+      - --long_query_time=2                       # Defines slow query threshold as 2 seconds
     volumes:
       - /var/lib/marzban/mysql:/var/lib/mysql
     healthcheck:
-      test: mysqladmin ping -h 127.0.0.1 -u marzban --password=password
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "marzban", "--password=\${MYSQL_PASSWORD}"]
+      start_period: 5s
+      interval: 5s
+      timeout: 5s
+      retries: 55
 EOF
 }
 
