@@ -18,5 +18,5 @@ bash <(wget -qO- https://dignezzz.github.io/marzban/move_to_sql.sh)
 ```
 ### На английском языке Миграция на MySQL
 ```bash
-bash <(wget -qO- https://dignezzz.github.io/marzban/migrate_to_sql.sh)
+bash <(wget -qO- https://dignezzz.github.io/marzban/migrate_to_mysql.sh)
 ```
