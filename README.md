@@ -3,6 +3,7 @@
 
 | Script Name | Command |
 |-------------|---------|
+| nginx-self.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/nginx-self.sh)` |
 | ufw_node.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/ufw_node.sh)` |
 | backup.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/backup.sh)` |
 | caddy-self.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/caddy-self.sh)` |
@@ -28,4 +29,4 @@
 | dest.sh | `bash <(wget -qO- https://dignezzz.github.io/server/dest.sh)` |
 
 
-_Last updated at Mon Dec 23 16:41:44 UTC 2024_ 
+_Last updated at Mon Dec 23 17:33:38 UTC 2024_ 
