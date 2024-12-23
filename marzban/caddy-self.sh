@@ -10,7 +10,7 @@ if [[ -z "$DOMAIN" ]]; then
 fi
 
 # Проверка открытых портов
-REQUIRED_PORTS=(80 8443)
+REQUIRED_PORTS=(8443)
 for PORT in "${REQUIRED_PORTS[@]}"; do
   if lsof -i ":$PORT" > /dev/null 2>&1; then
     echo "Port $PORT is already in use. Please free it and try again."
@@ -34,15 +34,23 @@ fi
 # Генерация Caddyfile с использованием указанного домена
 CADDYFILE_PATH="$CADDY_DIR/Caddyfile"
 cat <<EOF > "$CADDYFILE_PATH"
-# Заглушка для HTTP
-:80 {
-    respond 444
-}
+# Пример Caddyfile для DNS-челленджа Cloudflare
 
-# Основной сайт
 ${DOMAIN}:8443 {
     bind 0.0.0.0
 
+    # HTTPS через Let’s Encrypt (DNS challenge)
+    tls {
+        dns cloudflare {
+            # берем токен из переменной окружения
+            api_token env(CF_API_TOKEN)
+        }
+        email dignezzz@gmail.com
+        protocols tls1.2 tls1.3
+        curves x25519
+    }
+
+    # Блокируем подозрительные запросы
     @blocked {
         path_regexp evil_paths (?i)^.*[(\.\.)|(%2e%2e)|(%252e)|(//)|(\\\\)].*\$
         header_regexp evil_headers (?i)(base64|bash|cmd|curl|database|delete|eval|exec|exploit|gcc|hack|injection|nmap|perl|python|scan|select|shell|sql|wget)
@@ -53,11 +61,6 @@ ${DOMAIN}:8443 {
 
     root * $WWW_DIR
     file_server
-
-    tls {
-        protocols tls1.2 tls1.3
-        curves x25519
-    }
 
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
@@ -87,11 +90,13 @@ version: "3.8"
 
 services:
   caddy:
-    image: caddy:latest
+    build: .
     container_name: caddy-container
+    # Пробрасываем 8443 наружу
     ports:
-      - "80:80"
       - "8443:8443"
+    environment:
+      - CF_API_TOKEN=\${CF_API_TOKEN}
     volumes:
       - $PWD/$CADDY_DIR/Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
@@ -140,15 +145,15 @@ case "$1" in
     ;;
   r)
     echo "Restarting Caddy container..."
-    docker restart "$CONTAINER_NAME"
+    docker compose restart "$CONTAINER_NAME"
     ;;
   v)
     echo "Verifying $CADDYFILE syntax..."
-    docker run --rm -v $PWD/caddy/Caddyfile:/etc/caddy/Caddyfile caddy caddy validate --config /etc/caddy/Caddyfile
+    docker compose run --rm caddy caddy validate --config /etc/caddy/Caddyfile
     ;;
   f)
     echo "Formatting $CADDYFILE..."
-    docker run --rm -v $PWD/caddy/Caddyfile:/etc/caddy/Caddyfile caddy caddy fmt --overwrite /etc/caddy/Caddyfile
+    docker compose run --rm caddy caddy fmt --overwrite /etc/caddy/Caddyfile
     ;;
   reinstall)
     backup_files
@@ -195,10 +200,13 @@ echo "  reinstall: Backup, recreate, and restart the Caddy service"
 echo "  uninstall: Stop and remove the Caddy service and files, with backup"
 
 # Запуск контейнера
+docker compose build
 docker compose up -d
 
 if [[ $? -eq 0 ]]; then
-  echo "Caddy successfully started. Domain: ${DOMAIN}"
+  echo "Caddy with DNS-challenge (Cloudflare) successfully started!"
+  echo "Domain: ${DOMAIN}"
+  echo "Be sure to set CF_API_TOKEN in your environment before running docker compose."
 else
   echo "Caddy failed to start. Check configuration."
   exit 1
