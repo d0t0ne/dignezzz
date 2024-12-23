@@ -1,38 +1,42 @@
 #!/bin/bash
 
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+CYAN='\033[0;36m'
+RESET='\033[0m'
+
 if [[ "$EUID" -ne 0 ]]; then
-  echo "This script must be run as root or with sudo privileges. Exiting..."
+  echo -e "${RED}This script must be run as root or with sudo privileges. Exiting...${RESET}"
   exit 1
 fi
 
 if ! command -v sudo &> /dev/null; then
-  echo "Warning: 'sudo' is not installed. Commands will run as root."
+  echo -e "${YELLOW}Warning: 'sudo' is not installed. Commands will run as root.${RESET}"
   SUDO=""
 else
   SUDO="sudo"
 fi
 
-# Check if Nginx is already installed
 if command -v nginx &> /dev/null; then
-  echo "Nginx is already installed on this system."
-  echo "This script supports only fresh installations on servers with unoccupied ports 80 and 8443."
-  echo "Please remove Nginx first and run this script again."
-  echo "You can uninstall Nginx using the following command:"
-  echo "  sudo apt-get remove --purge -y nginx && sudo apt-get autoremove -y"
+  echo -e "${RED}Nginx is already installed on this system.${RESET}"
+  echo -e "${CYAN}This script supports only fresh installations on servers with unoccupied ports 80 and 8443.${RESET}"
+  echo -e "${YELLOW}Please remove Nginx first and run this script again.${RESET}"
+  echo -e "You can uninstall Nginx using the following command:"
+  echo -e "${GREEN}  sudo apt-get remove --purge -y nginx && sudo apt-get autoremove -y${RESET}"
   exit 1
 fi
 
-# Check if ports 80 and 8443 are free
 if ss -tlnp | grep -qE ":80\b|:8443\b"; then
-  echo "Ports 80 or 8443 are already in use."
-  echo "This script requires these ports to be free."
-  echo "Please stop any processes using these ports and run the script again."
+  echo -e "${RED}Ports 80 or 8443 are already in use.${RESET}"
+  echo -e "${CYAN}This script requires these ports to be free.${RESET}"
+  echo -e "${YELLOW}Please stop any processes using these ports and run the script again.${RESET}"
   exit 1
 fi
 
 read -p "Please enter your domain (e.g., example.com): " DOMAIN
 if [[ -z "$DOMAIN" ]]; then
-  echo "No domain provided. Exiting..."
+  echo -e "${RED}No domain provided. Exiting...${RESET}"
   exit 1
 fi
 
@@ -43,18 +47,18 @@ generate_random_email() {
 read -p "Please enter your email for certificate registration (leave blank to auto-generate): " EMAIL
 if [[ -z "$EMAIL" ]]; then
   EMAIL=$(generate_random_email)
-  echo "No email provided. Generated email: $EMAIL"
+  echo -e "${YELLOW}No email provided. Generated email: ${EMAIL}${RESET}"
 fi
 
 DOMAIN_FILE="/etc/nginx/current_domain.txt"
 $SUDO mkdir -p /etc/nginx
 echo "$DOMAIN" | $SUDO tee "$DOMAIN_FILE" > /dev/null
 
-echo "Installing Nginx, Certbot, and python3-certbot-nginx..."
+echo -e "${CYAN}Installing Nginx, Certbot, and python3-certbot-nginx...${RESET}"
 $SUDO apt-get update
 $SUDO apt-get install -y nginx certbot python3-certbot-nginx
 if [[ $? -ne 0 ]]; then
-  echo "Failed to install required packages. Ensure your system is updated and retry."
+  echo -e "${RED}Failed to install required packages. Ensure your system is updated and retry.${RESET}"
   exit 1
 fi
 
@@ -83,10 +87,10 @@ echo "Enabling and starting Nginx..."
 $SUDO systemctl enable nginx
 $SUDO systemctl restart nginx
 
-echo "Obtaining Let's Encrypt certificate for $DOMAIN with email $EMAIL..."
+echo -e "${CYAN}Obtaining Let's Encrypt certificate for ${DOMAIN} with email ${EMAIL}...${RESET}"
 $SUDO certbot --nginx -d "$DOMAIN" --email "$EMAIL" --agree-tos --no-eff-email
 if [[ $? -ne 0 ]]; then
-  echo "Certbot failed to obtain a certificate. Check the error messages above."
+  echo -e "${RED}Certbot failed to obtain a certificate. Check the error messages above.${RESET}"
   exit 1
 fi
 
@@ -171,78 +175,85 @@ $SUDO rm -f /etc/nginx/sites-enabled/letsencrypt.conf
 $SUDO rm -f /etc/nginx/sites-available/letsencrypt.conf
 
 SELF_PATH="/usr/local/bin/self"
-$SUDO bash -c "cat <<'EOF' > \"$SELF_PATH\"
+$SUDO bash -c "cat << 'EOF' > \"$SELF_PATH\"
 #!/bin/bash
 
-CERT_DIR="/etc/letsencrypt/live"
-DOMAIN_FILE="/etc/nginx/current_domain.txt"
-DOMAIN=""
+# Цвета для выделения
+RED='\\033[0;31m'
+GREEN='\\033[0;32m'
+YELLOW='\\033[0;33m'
+CYAN='\\033[0;36m'
+BOLD='\\033[1m'
+RESET='\\033[0m'
+
+CERT_DIR=\"/etc/letsencrypt/live\"
+DOMAIN_FILE=\"/etc/nginx/current_domain.txt\"
+DOMAIN=\"\"
 
 if [[ -f \$DOMAIN_FILE ]]; then
   DOMAIN=\$(cat \$DOMAIN_FILE)
 else
-  echo "Domain file not found. Set DOMAIN manually."
-  DOMAIN="example.com"
+  echo -e \"\${RED}Domain file not found. Set DOMAIN manually.\${RESET}\"
+  DOMAIN=\"example.com\"
 fi
 
 help_menu() {
-  echo ""
-  echo "============================"
-  echo " Nginx Management Utility "
-  echo "============================"
-  echo ""
-  echo "Available Commands:"
-  echo "  e             Edit /etc/nginx/nginx.conf"
-  echo "  r             Restart Nginx"
-  echo "  logs          Show Nginx logs"
-  echo "  s|status      Show 'systemctl status nginx'"
-  echo "  renew         Renew SSL certificates"
-  echo "  cert-status   Check SSL certificate expiration"
-  echo "  reinstall     Reload Nginx"
-  echo "  uninstall     Remove Nginx, Certbot, and configurations"
-  echo ""
-  echo "Current Configuration Info:"
-  echo "  Domain SNI: \$DOMAIN"
-  echo "  Destination:  127.0.0.1:8443"
-  echo "  Cert Path:    \$CERT_DIR/\$DOMAIN/"
-  echo ""
+  echo -e \"\"
+  echo -e \"\${CYAN}=========================================\${RESET}\"
+  echo -e \"\${BOLD}          Nginx Management Utility        \${RESET}\"
+  echo -e \"\${CYAN}=========================================\${RESET}\"
+  echo -e \"\"
+  echo -e \"\${BOLD}Available Commands:\${RESET}\"
+  echo -e \"  \${GREEN}e\${RESET}             \${YELLOW}Edit /etc/nginx/nginx.conf\${RESET}\"
+  echo -e \"  \${GREEN}r\${RESET}             \${YELLOW}Restart Nginx\${RESET}\"
+  echo -e \"  \${GREEN}logs\${RESET}          \${YELLOW}Show Nginx logs\${RESET}\"
+  echo -e \"  \${GREEN}s | status\${RESET}    \${YELLOW}Show 'systemctl status nginx'\${RESET}\"
+  echo -e \"  \${GREEN}renew\${RESET}         \${YELLOW}Renew SSL certificates\${RESET}\"
+  echo -e \"  \${GREEN}cert-status\${RESET}   \${YELLOW}Check SSL certificate expiration\${RESET}\"
+  echo -e \"  \${GREEN}reinstall\${RESET}     \${YELLOW}Reload Nginx\${RESET}\"
+  echo -e \"  \${GREEN}uninstall\${RESET}     \${YELLOW}Remove Nginx, Certbot, and configurations\${RESET}\"
+  echo -e \"\"
+  echo -e \"\${BOLD}Current Configuration Info:\${RESET}\"
+  echo -e \"  \${CYAN}Domain SNI:\${RESET} \$DOMAIN\"
+  echo -e \"  \${CYAN}Destination:\${RESET}  127.0.0.1:8443\"
+  echo -e \"  \${CYAN}Cert Path:\${RESET}    \$CERT_DIR/\$DOMAIN/\"
+  echo -e \"\"
 }
-
 
 cert_status() {
   if [[ -d \$CERT_DIR/\$DOMAIN ]]; then
     EXPIRY_DATE=\$(openssl x509 -enddate -noout -in \$CERT_DIR/\$DOMAIN/fullchain.pem | cut -d= -f2)
-    echo "Certificate for \$DOMAIN expires on: \$EXPIRY_DATE"
+    echo -e \"\${GREEN}Certificate for \$DOMAIN expires on: \${BOLD}\$EXPIRY_DATE\${RESET}\"
   else
-    echo "Certificate files not found for domain \$DOMAIN in \$CERT_DIR."
+    echo -e \"\${RED}Certificate files not found for domain \$DOMAIN in \$CERT_DIR.\${RESET}\"
   fi
 }
 
 renew_certs() {
-  echo "Renewing SSL certificates for \$DOMAIN..."
+  echo -e \"\${YELLOW}Renewing SSL certificates for \$DOMAIN...\${RESET}\"
   certbot renew --nginx
   if [[ \$? -eq 0 ]]; then
-    echo "Certificates successfully renewed."
+    echo -e \"\${GREEN}Certificates successfully renewed.\${RESET}\"
   else
-    echo "Failed to renew certificates. Check Certbot logs for details."
+    echo -e \"\${RED}Failed to renew certificates. Check Certbot logs for details.\${RESET}\"
   fi
 }
 
-case "\$1" in
+case \"\$1\" in
   e)
-    echo "Opening /etc/nginx/nginx.conf..."
+    echo -e \"\${CYAN}Opening /etc/nginx/nginx.conf...\${RESET}\"
     nano /etc/nginx/nginx.conf
     ;;
   r)
-    echo "Restarting Nginx..."
+    echo -e \"\${CYAN}Restarting Nginx...\${RESET}\"
     systemctl restart nginx
     ;;
   logs)
-    echo "Showing Nginx logs (Ctrl+C to exit)..."
+    echo -e \"\${CYAN}Showing Nginx logs (Ctrl+C to exit)...\${RESET}\"
     journalctl -u nginx -n 50 -f
     ;;
   s|status)
-    echo "-- systemctl status nginx --"
+    echo -e \"\${CYAN}-- systemctl status nginx --\${RESET}\"
     systemctl status nginx
     ;;
   renew)
@@ -252,30 +263,32 @@ case "\$1" in
     cert_status
     ;;
   reinstall)
-    echo "Reloading Nginx configuration..."
+    echo -e \"\${CYAN}Reloading Nginx configuration...\${RESET}\"
     systemctl reload nginx || systemctl restart nginx
     ;;
   uninstall)
-    echo "Stopping and removing Nginx and Certbot..."
+    echo -e \"\${YELLOW}Stopping and removing Nginx and Certbot...\${RESET}\"
     systemctl stop nginx
     apt-get remove --purge -y nginx certbot python3-certbot-nginx
     apt-get autoremove -y
     rm -rf /etc/letsencrypt
     rm -rf /etc/nginx
     rm -f /usr/local/bin/self
-    echo "All components removed."
+    echo -e \"\${RED}All components removed.\${RESET}\"
     ;;
-  help|"")
+  help|\")
     help_menu
     ;;
   *)
-    echo "Invalid command."
+    echo -e \"\${RED}Invalid command.\${RESET}\"
     help_menu
     ;;
 esac
 EOF"
 
+
 $SUDO chmod +x "$SELF_PATH"
+
 if [[ ":$PATH:" != *":/usr/local/bin:"* ]]; then
  export PATH=$PATH:/usr/local/bin
 fi
