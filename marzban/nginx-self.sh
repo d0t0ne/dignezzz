@@ -1,12 +1,6 @@
 #!/bin/bash
 
-###############################################################################
-# This script installs Nginx and Certbot on Ubuntu/Debian, creates a minimal 
-# HTTP config for Certbot, obtains a certificate for DOMAIN using default 
-# certbot directories, copies the resulting cert files to /var/lib/marzban/*.pem,
-# and applies a secure nginx.conf listening on port 8443.
-# All user interaction and messages in English; code comments in English as well.
-###############################################################################
+
 
 # Step 1: Ask for domain
 read -p "Please enter your domain (e.g. example.com): " DOMAIN
