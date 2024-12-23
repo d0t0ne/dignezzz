@@ -18,6 +18,16 @@ if [[ -z "$DOMAIN" ]]; then
   exit 1
 fi
 
+generate_random_email() {
+  echo "$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c35)@gmail.com"
+}
+
+read -p "Please enter your email for certificate registration (leave blank to auto-generate): " EMAIL
+if [[ -z "$EMAIL" ]]; then
+  EMAIL=$(generate_random_email)
+  echo "No email provided. Generated email: $EMAIL"
+fi
+
 DOMAIN_FILE="/etc/nginx/current_domain.txt"
 $SUDO mkdir -p /etc/nginx
 echo "$DOMAIN" | $SUDO tee "$DOMAIN_FILE" > /dev/null
@@ -55,8 +65,8 @@ echo "Enabling and starting Nginx..."
 $SUDO systemctl enable nginx
 $SUDO systemctl restart nginx
 
-echo "Obtaining Let's Encrypt certificate for $DOMAIN..."
-$SUDO certbot --nginx -d "$DOMAIN"
+echo "Obtaining Let's Encrypt certificate for $DOMAIN with email $EMAIL..."
+$SUDO certbot --nginx -d "$DOMAIN" --email "$EMAIL" --agree-tos --no-eff-email
 if [[ $? -ne 0 ]]; then
   echo "Certbot failed to obtain a certificate. Check the error messages above."
   exit 1
