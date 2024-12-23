@@ -13,6 +13,7 @@
 | core_change.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/core_change.sh)` |
 | migrate_to_mysql.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/migrate_to_mysql.sh)` |
 | backup2.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/backup2.sh)` |
+| nginx-s2.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/nginx-s2.sh)` |
 
 ## server
 
@@ -29,4 +30,4 @@
 | dest.sh | `bash <(wget -qO- https://dignezzz.github.io/server/dest.sh)` |
 
 
-_Last updated at Mon Dec 23 19:43:01 UTC 2024_ 
+_Last updated at Mon Dec 23 19:44:10 UTC 2024_ 
