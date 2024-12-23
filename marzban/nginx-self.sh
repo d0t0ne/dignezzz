@@ -91,7 +91,7 @@ if [[ $? -ne 0 ]]; then
 fi
 
 echo "Configuring Nginx with a secure configuration..."
-$SUDO bash -c "cat <<EOF > /etc/nginx/nginx.conf
+$SUDO bash -c "cat <<'EOF' > /etc/nginx/nginx.conf
 user www-data;
 worker_processes auto;
 pid /run/nginx.pid;
