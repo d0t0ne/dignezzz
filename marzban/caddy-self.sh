@@ -1,5 +1,6 @@
 #!/bin/bash
 
+
 # Запрос домена у пользователя
 read -p "Enter your domain (e.g., example.com): " DOMAIN
 
@@ -9,14 +10,19 @@ if [[ -z "$DOMAIN" ]]; then
   exit 1
 fi
 
-# Проверка открытых портов
-REQUIRED_PORTS=(8443)
-for PORT in "${REQUIRED_PORTS[@]}"; do
-  if lsof -i ":$PORT" > /dev/null 2>&1; then
-    echo "Port $PORT is already in use. Please free it and try again."
-    exit 1
-  fi
-done
+# Проверка открытого порта 80 (обязателен для HTTP-челленджа)
+REQUIRED_PORT=80
+if lsof -i ":$REQUIRED_PORT" > /dev/null 2>&1; then
+  echo "Port $REQUIRED_PORT is already in use. Please free it and try again."
+  exit 1
+fi
+
+# Проверка, что 8443 свободен
+ALT_PORT=8443
+if lsof -i ":$ALT_PORT" > /dev/null 2>&1; then
+  echo "Port $ALT_PORT is already in use. Please free it and try again."
+  exit 1
+fi
 
 # Создание структуры директорий
 CADDY_DIR="./caddy"
@@ -25,26 +31,39 @@ LOG_DIR="/var/log/caddy"
 
 mkdir -p "$CADDY_DIR" "$WWW_DIR" "$LOG_DIR"
 
-# Проверка прав доступа к нужным директориям
+# Проверка прав доступа
 if [[ ! -w "$CADDY_DIR" || ! -w "$WWW_DIR" || ! -w "$LOG_DIR" ]]; then
   echo "Insufficient permissions for required directories. Exiting."
   exit 1
 fi
 
-# Генерация Caddyfile с использованием указанного домена
+# Генерация Caddyfile
 CADDYFILE_PATH="$CADDY_DIR/Caddyfile"
 cat <<EOF > "$CADDYFILE_PATH"
-# Пример Caddyfile для DNS-челленджа Cloudflare
+# 1) Блок :80 нужен, чтобы Let’s Encrypt мог проверять HTTP-челлендж
+:80 {
+    # Редиректим всё остальное на порт 8443, кроме ACME-челленджа, который Caddy обрабатывает автоматически
+    @acme_challenge {
+        path /.well-known/acme-challenge/*
+    }
+    handle @acme_challenge {
+        # Тут Caddy сам ответит на челлендж
+        route {
+            # пусто — Caddy обрабатывает ACME автоматически
+        }
+    }
 
+    # Всё, что не относится к челленджу, уводим на 8443
+    handle {
+        redir https://{host}:8443{uri}
+    }
+}
+
+# 2) Основной сайт: слушаем 8443, получаем сертификат на DOMAIN
 ${DOMAIN}:8443 {
     bind 0.0.0.0
 
-    # HTTPS через Let’s Encrypt (DNS challenge)
     tls {
-        dns cloudflare {
-            # берем токен из переменной окружения
-            api_token env(CF_API_TOKEN)
-        }
         email dignezzz@gmail.com
         protocols tls1.2 tls1.3
         curves x25519
@@ -86,17 +105,14 @@ EOF
 # Создание docker-compose.yml
 COMPOSE_FILE="./docker-compose.yml"
 cat <<EOF > "$COMPOSE_FILE"
-version: "3.8"
-
 services:
   caddy:
-    build: .
+    image: caddy:latest
     container_name: caddy-container
-    # Пробрасываем 8443 наружу
+    # Пробрасываем только 80 и 8443
     ports:
+      - "80:80"
       - "8443:8443"
-    environment:
-      - CF_API_TOKEN=\${CF_API_TOKEN}
     volumes:
       - $PWD/$CADDY_DIR/Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
@@ -200,13 +216,12 @@ echo "  reinstall: Backup, recreate, and restart the Caddy service"
 echo "  uninstall: Stop and remove the Caddy service and files, with backup"
 
 # Запуск контейнера
-docker compose build
 docker compose up -d
 
 if [[ $? -eq 0 ]]; then
-  echo "Caddy with DNS-challenge (Cloudflare) successfully started!"
-  echo "Domain: ${DOMAIN}"
-  echo "Be sure to set CF_API_TOKEN in your environment before running docker compose."
+  echo "Caddy started on ports 80 and 8443, Let's Encrypt will run HTTP challenge on 80."
+  echo "Domain: $DOMAIN (access via https://$DOMAIN:8443)"
+  echo "Port 443 is FREE."
 else
   echo "Caddy failed to start. Check configuration."
   exit 1
