@@ -73,7 +73,7 @@ if [[ $? -ne 0 ]]; then
 fi
 
 echo "Configuring Nginx with a secure configuration..."
-$SUDO bash -c "cat <<'EOF' > /etc/nginx/nginx.conf
+$SUDO bash -c "cat <<EOF > /etc/nginx/nginx.conf
 user www-data;
 worker_processes auto;
 pid /run/nginx.pid;
@@ -107,7 +107,7 @@ http {
 
         ssl_protocols TLSv1.2 TLSv1.3;
         ssl_prefer_server_ciphers on;
-        ssl_ciphers "EECDH+ECDSA+AESGCM EECDH+aRSA+AESGCM EECDH+ECDSA+SHA384 EECDH+ECDSA+SHA256 EECDH+aRSA+SHA384 EECDH+aRSA+SHA256 EECDH+aRSA+RC4 EECDH EDH+aRSA RC4 !aNULL !eNULL !LOW !3DES !MD5 !EXP !PSK !SRP !DSS";
+        ssl_ciphers 'EECDH+ECDSA+AESGCM EECDH+aRSA+AESGCM EECDH+ECDSA+SHA384 EECDH+ECDSA+SHA256 EECDH+aRSA+SHA384 EECDH+aRSA+SHA256 EECDH+aRSA+RC4 EECDH EDH+aRSA RC4 !aNULL !eNULL !LOW !3DES !MD5 !EXP !PSK !SRP !DSS';
 
         ssl_stapling on;
         ssl_stapling_verify on;
@@ -118,10 +118,10 @@ http {
         ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
         ssl_trusted_certificate /etc/letsencrypt/live/$DOMAIN/chain.pem;
 
-        add_header Referrer-Policy "no-referrer-when-downgrade" always;
-        add_header Permissions-Policy \"interest-cohort=\\(\\)\" always;
-        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-        add_header Content-Security-Policy "script-src 'self' 'unsafe-inline'";
+        add_header Referrer-Policy 'no-referrer-when-downgrade' always;
+        add_header Permissions-Policy 'interest-cohort=()' always;
+        add_header Strict-Transport-Security 'max-age=31536000; includeSubDomains' always;
+        add_header Content-Security-Policy 'script-src \\'self\\' \\'unsafe-inline\\'';
 
         proxy_hide_header X-Powered-By;
 
@@ -143,12 +143,18 @@ http {
 }
 EOF"
 
-echo "Removing temporary Certbot configuration..."
-$SUDO rm -f /etc/nginx/sites-enabled/letsencrypt.conf
-$SUDO rm -f /etc/nginx/sites-available/letsencrypt.conf
+echo "Checking Nginx configuration for errors..."
+if ! $SUDO nginx -t; then
+  echo "Nginx configuration contains errors. Please fix them before reloading."
+  exit 1
+fi
 
 echo "Reloading Nginx to apply the new configuration..."
 $SUDO systemctl reload nginx
+
+echo "Removing temporary Certbot configuration..."
+$SUDO rm -f /etc/nginx/sites-enabled/letsencrypt.conf
+$SUDO rm -f /etc/nginx/sites-available/letsencrypt.conf
 
 SELF_PATH="/usr/local/bin/self"
 $SUDO bash -c "cat <<'EOF' > \"$SELF_PATH\"
