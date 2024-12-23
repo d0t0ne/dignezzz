@@ -73,7 +73,7 @@ if [[ $? -ne 0 ]]; then
 fi
 
 echo "Configuring Nginx with a secure configuration..."
-$SUDO bash -c "cat <<EOF > /etc/nginx/nginx.conf
+$SUDO bash -c "cat <<'EOF' > /etc/nginx/nginx.conf
 user www-data;
 worker_processes auto;
 pid /run/nginx.pid;
@@ -119,7 +119,7 @@ http {
         ssl_trusted_certificate /etc/letsencrypt/live/$DOMAIN/chain.pem;
 
         add_header Referrer-Policy "no-referrer-when-downgrade" always;
-        add_header Permissions-Policy "interest-cohort=()" always;
+        add_header Permissions-Policy \"interest-cohort=\\(\\)\" always;
         add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
         add_header Content-Security-Policy "script-src 'self' 'unsafe-inline'";
 
@@ -150,111 +150,4 @@ $SUDO rm -f /etc/nginx/sites-available/letsencrypt.conf
 echo "Reloading Nginx to apply the new configuration..."
 $SUDO systemctl reload nginx
 
-SELF_PATH="/usr/local/bin/self"
-$SUDO bash -c "cat <<'EOF' > \"$SELF_PATH\"
-#!/bin/bash
-
-CERT_DIR="/etc/letsencrypt/live"
-DOMAIN_FILE="/etc/nginx/current_domain.txt"
-DOMAIN=""
-
-if [[ -f \$DOMAIN_FILE ]]; then
-  DOMAIN=\$(cat \$DOMAIN_FILE)
-else
-  echo "Domain file not found. Set DOMAIN manually."
-  DOMAIN="example.com"
-fi
-
-help_menu() {
-  echo ""
-  echo "============================"
-  echo " Nginx Management Utility "
-  echo "============================"
-  echo ""
-  echo "Available Commands:"
-  echo "  e             Edit /etc/nginx/nginx.conf"
-  echo "  r             Restart Nginx"
-  echo "  logs          Show Nginx logs (last 50 lines, then follow)"
-  echo "  s|status      Show 'systemctl status nginx'"
-  echo "  renew         Renew SSL certificates"
-  echo "  cert-status   Check SSL certificate expiration"
-  echo "  reinstall     Reload Nginx"
-  echo "  uninstall     Remove Nginx, Certbot, and configurations"
-  echo ""
-  echo "Current Configuration Info:"
-  echo "  Domain (SNI): \$DOMAIN"
-  echo "  Destination:  127.0.0.1:8443"
-  echo "  Cert Path:    \$CERT_DIR/\$DOMAIN/"
-  echo ""
-}
-
-cert_status() {
-  if [[ -d \$CERT_DIR/\$DOMAIN ]]; then
-    EXPIRY_DATE=\$(openssl x509 -enddate -noout -in \$CERT_DIR/\$DOMAIN/fullchain.pem | cut -d= -f2)
-    echo "Certificate for \$DOMAIN expires on: \$EXPIRY_DATE"
-  else
-    echo "Certificate files not found for domain \$DOMAIN in \$CERT_DIR."
-  fi
-}
-
-renew_certs() {
-  echo "Renewing SSL certificates for \$DOMAIN..."
-  certbot renew --nginx
-  if [[ \$? -eq 0 ]]; then
-    echo "Certificates successfully renewed."
-  else
-    echo "Failed to renew certificates. Check Certbot logs for details."
-  fi
-}
-
-case "\$1" in
-  e)
-    echo "Opening /etc/nginx/nginx.conf..."
-    nano /etc/nginx/nginx.conf
-    ;;
-  r)
-    echo "Restarting Nginx..."
-    systemctl restart nginx
-    ;;
-  logs)
-    echo "Showing Nginx logs (Ctrl+C to exit)..."
-    journalctl -u nginx -n 50 -f
-    ;;
-  s|status)
-    echo "-- systemctl status nginx --"
-    systemctl status nginx
-    ;;
-  renew)
-    renew_certs
-    ;;
-  cert-status)
-    cert_status
-    ;;
-  reinstall)
-    echo "Reloading Nginx configuration..."
-    systemctl reload nginx || systemctl restart nginx
-    ;;
-  uninstall)
-    echo "Stopping and removing Nginx and Certbot..."
-    systemctl stop nginx
-    apt remove --purge -y nginx certbot python3-certbot-nginx
-    apt autoremove -y
-    rm -rf /etc/letsencrypt
-    rm -rf /etc/nginx
-    rm -f /usr/local/bin/self
-    echo "All components removed."
-    ;;
-  help|"")
-    help_menu
-    ;;
-  *)
-    echo "Invalid command."
-    help_menu
-    ;;
-esac
-EOF"
-
-$SUDO chmod +x "$SELF_PATH"
-
 echo "Installation complete!"
-echo "You can manage Nginx using the 'self' utility."
