@@ -91,12 +91,6 @@ http {
         return 444;
     }
 
-    # Опционально — если ваша версия Nginx поддерживает:
-    # server {
-    #    listen 8443 ssl;
-    #    ssl_reject_handshake on;
-    # }
-
     server {
         listen 80;
         server_name $DOMAIN;
@@ -263,6 +257,9 @@ esac
 EOF"
 
 $SUDO chmod +x "$SELF_PATH"
+if [[ ":$PATH:" != *":/usr/local/bin:"* ]]; then
+ export PATH=$PATH:/usr/local/bin
+fi
 
 echo "Installation complete!"
 echo "You can manage Nginx using the 'self' utility."
