@@ -10,7 +10,7 @@ if [[ -z "$DOMAIN" ]]; then
 fi
 
 # Проверка открытых портов
-REQUIRED_PORTS=(80 443 8443)
+REQUIRED_PORTS=(80 8443)
 for PORT in "${REQUIRED_PORTS[@]}"; do
   if lsof -i ":$PORT" > /dev/null 2>&1; then
     echo "Port $PORT is already in use. Please free it and try again."
@@ -91,7 +91,6 @@ services:
     container_name: caddy-container
     ports:
       - "80:80"
-      - "443:443"
       - "8443:8443"
     volumes:
       - $PWD/$CADDY_DIR/Caddyfile:/etc/caddy/Caddyfile
