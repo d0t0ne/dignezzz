@@ -194,7 +194,7 @@ help_menu() {
   echo "Available Commands:"
   echo "  e             Edit /etc/nginx/nginx.conf"
   echo "  r             Restart Nginx"
-  echo "  logs          Show Nginx logs (last 50 lines, then follow)"
+  echo "  logs          Show Nginx logs"
   echo "  s|status      Show 'systemctl status nginx'"
   echo "  renew         Renew SSL certificates"
   echo "  cert-status   Check SSL certificate expiration"
@@ -202,11 +202,12 @@ help_menu() {
   echo "  uninstall     Remove Nginx, Certbot, and configurations"
   echo ""
   echo "Current Configuration Info:"
-  echo "  Domain (SNI): \$DOMAIN"
+  echo "  Domain SNI: \$DOMAIN"
   echo "  Destination:  127.0.0.1:8443"
   echo "  Cert Path:    \$CERT_DIR/\$DOMAIN/"
   echo ""
 }
+
 
 cert_status() {
   if [[ -d \$CERT_DIR/\$DOMAIN ]]; then
