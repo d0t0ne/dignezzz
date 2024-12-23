@@ -33,8 +33,8 @@ $SUDO mkdir -p /etc/nginx
 echo "$DOMAIN" | $SUDO tee "$DOMAIN_FILE" > /dev/null
 
 echo "Installing Nginx, Certbot, and python3-certbot-nginx..."
-$SUDO apt update
-$SUDO apt install -y nginx certbot python3-certbot-nginx
+$SUDO apt-get update
+$SUDO apt-get install -y nginx certbot python3-certbot-nginx
 if [[ $? -ne 0 ]]; then
   echo "Failed to install required packages. Ensure your system is updated and retry."
   exit 1
@@ -85,15 +85,17 @@ events {
 }
 
 http {
+    # Блок-заглушка, чтобы отсеять любые случайные запросы на 80 порт
     server {
         listen 80 default_server;
         return 444;
     }
 
-    server {
-        listen 8443 ssl;
-        ssl_reject_handshake on;
-    }
+    # Опционально — если ваша версия Nginx поддерживает:
+    # server {
+    #    listen 8443 ssl;
+    #    ssl_reject_handshake on;
+    # }
 
     server {
         listen 80;
@@ -107,7 +109,7 @@ http {
 
         ssl_protocols TLSv1.2 TLSv1.3;
         ssl_prefer_server_ciphers on;
-        ssl_ciphers 'EECDH+ECDSA+AESGCM EECDH+aRSA+AESGCM EECDH+ECDSA+SHA384 EECDH+ECDSA+SHA256 EECDH+aRSA+SHA384 EECDH+aRSA+SHA256 EECDH+aRSA+RC4 EECDH EDH+aRSA RC4 !aNULL !eNULL !LOW !3DES !MD5 !EXP !PSK !SRP !DSS';
+        ssl_ciphers 'EECDH+ECDSA+AESGCM:EECDH+aRSA+AESGCM:EECDH+ECDSA+SHA384:EECDH+ECDSA+SHA256:EECDH+aRSA+SHA384:EECDH+aRSA+SHA256:EECDH EDH+aRSA !aNULL !eNULL !LOW !3DES !MD5 !EXP !PSK !SRP !DSS !RC4';
 
         ssl_stapling on;
         ssl_stapling_verify on;
@@ -121,7 +123,7 @@ http {
         add_header Referrer-Policy 'no-referrer-when-downgrade' always;
         add_header Permissions-Policy 'interest-cohort=()' always;
         add_header Strict-Transport-Security 'max-age=31536000; includeSubDomains' always;
-        add_header Content-Security-Policy 'script-src \\'self\\' \\'unsafe-inline\\'';
+        add_header Content-Security-Policy \"script-src 'self' 'unsafe-inline'\";
 
         proxy_hide_header X-Powered-By;
 
@@ -243,8 +245,8 @@ case "\$1" in
   uninstall)
     echo "Stopping and removing Nginx and Certbot..."
     systemctl stop nginx
-    apt remove --purge -y nginx certbot python3-certbot-nginx
-    apt autoremove -y
+    apt-get remove --purge -y nginx certbot python3-certbot-nginx
+    apt-get autoremove -y
     rm -rf /etc/letsencrypt
     rm -rf /etc/nginx
     rm -f /usr/local/bin/self
