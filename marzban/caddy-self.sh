@@ -188,14 +188,11 @@ case "$1" in
     ;;
   logs)
     echo "Showing logs for Caddy container..."
-    docker compose logs --tail=50 -f "$CONTAINER_NAME"
+    docker compose logs --tail=50 -f caddy
     ;;
   s|status)
     echo "---- Container status ----"
     docker compose ps "$CONTAINER_NAME"
-    echo
-    echo "---- System service status for caddy (if any) ----"
-    systemctl status caddy || echo "No systemd service named 'caddy' found, or systemd not in use."
     ;;
   reinstall)
     backup_files
