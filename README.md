@@ -5,10 +5,10 @@
 |-------------|---------|
 | ufw_node.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/ufw_node.sh)` |
 | backup.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/backup.sh)` |
+| caddy-self.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/caddy-self.sh)` |
 | backup2e.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/backup2e.sh)` |
 | ufw_main.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/ufw_main.sh)` |
 | move_to_sql.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/move_to_sql.sh)` |
-| caddy-dss.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/caddy-dss.sh)` |
 | core_change.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/core_change.sh)` |
 | migrate_to_mysql.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/migrate_to_mysql.sh)` |
 | backup2.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/backup2.sh)` |
@@ -28,4 +28,4 @@
 | dest.sh | `bash <(wget -qO- https://dignezzz.github.io/server/dest.sh)` |
 
 
-_Last updated at Mon Dec 16 12:38:18 UTC 2024_ 
+_Last updated at Mon Dec 23 16:14:57 UTC 2024_ 
