@@ -12,6 +12,24 @@ else
   SUDO="sudo"
 fi
 
+# Check if Nginx is already installed
+if command -v nginx &> /dev/null; then
+  echo "Nginx is already installed on this system."
+  echo "This script supports only fresh installations on servers with unoccupied ports 80 and 8443."
+  echo "Please remove Nginx first and run this script again."
+  echo "You can uninstall Nginx using the following command:"
+  echo "  sudo apt-get remove --purge -y nginx && sudo apt-get autoremove -y"
+  exit 1
+fi
+
+# Check if ports 80 and 8443 are free
+if ss -tlnp | grep -qE ":80\b|:8443\b"; then
+  echo "Ports 80 or 8443 are already in use."
+  echo "This script requires these ports to be free."
+  echo "Please stop any processes using these ports and run the script again."
+  exit 1
+fi
+
 read -p "Please enter your domain (e.g., example.com): " DOMAIN
 if [[ -z "$DOMAIN" ]]; then
   echo "No domain provided. Exiting..."
