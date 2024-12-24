@@ -45,8 +45,17 @@ else
   echo -e "${GREEN}Nginx installed successfully.${RESET}"
 fi
 
+# Запрос домена у пользователя
+read -p "Enter your domain name (e.g., example.com): " DOMAIN
+if [[ -z "$DOMAIN" ]]; then
+  echo -e "${RED}Domain cannot be empty. Exiting...${RESET}"
+  exit 1
+fi
+
+echo "$DOMAIN" > "$DOMAIN_FILE"
+
 CONF_FILE="/etc/nginx/sites-available/sni.conf"
-$SUDO bash -c "cat <<'EOF' > \"$CONF_FILE\"
+$SUDO bash -c "cat <<EOF > \"$CONF_FILE\"
 server {
     listen 127.0.0.1:8443 ssl http2 proxy_protocol;
     server_name $DOMAIN;
@@ -92,7 +101,13 @@ server {
 EOF"
 
 ln -sf "$CONF_FILE" /etc/nginx/sites-enabled/
-$SUDO nginx -t && $SUDO systemctl reload nginx
+if $SUDO nginx -t; then
+  $SUDO systemctl reload nginx
+  echo -e "${GREEN}Nginx reloaded successfully with the new configuration.${RESET}"
+else
+  echo -e "${RED}Nginx configuration test failed. Please check the configuration file.${RESET}"
+  exit 1
+fi
 
 $SUDO bash -c "cat << 'EOF' > \"$SELF_PATH\""
 #!/bin/bash
