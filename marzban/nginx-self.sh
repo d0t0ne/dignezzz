@@ -40,6 +40,22 @@ if [[ -z "$DOMAIN" ]]; then
   exit 1
 fi
 
+if command -v ufw &> /dev/null && ufw status | grep -qw active; then
+  echo -e "${CYAN}UFW is active. Ensuring port 80 is open...${RESET}"
+  ufw allow 80/tcp
+  ufw reload
+else
+  echo -e "${YELLOW}UFW is not active. Checking iptables rules...${RESET}"
+  
+  if ! iptables -C INPUT -p tcp --dport 80 -j ACCEPT &> /dev/null; then
+    echo -e "${CYAN}Port 80 is not open in iptables. Adding rule...${RESET}"
+    iptables -I INPUT -p tcp --dport 80 -j ACCEPT
+  else
+    echo -e "${GREEN}Port 80 is already open in iptables.${RESET}"
+  fi
+fi
+
+
 generate_random_email() {
   echo "$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c35)@gmail.com"
 }
@@ -300,6 +316,20 @@ $SUDO chmod +x "$SELF_PATH"
 if [[ ":$PATH:" != *":/usr/local/bin:"* ]]; then
  export PATH=$PATH:/usr/local/bin
 fi
+
+if command -v ufw &> /dev/null && ufw status | grep -qw active; then
+  echo -e "${CYAN}Closing ports 80 and 8443 in UFW...${RESET}"
+  ufw delete allow 80/tcp
+  ufw delete allow 8443/tcp
+  ufw reload
+else
+  echo -e "${CYAN}Applying iptables rules to block external access to ports 80 and 8443...${RESET}"
+  iptables -I INPUT -p tcp --dport 8443 ! -s 127.0.0.1 -j DROP
+  iptables -I INPUT -p tcp --dport 80 ! -s 127.0.0.1 -j DROP
+fi
+mkdir -p /var/lib/marzban/certs
+ln -s /etc/letsencrypt/live/${DOMAIN}/fullchain.pem /var/lib/marzban/certs/fullchain.pem
+ln -s /etc/letsencrypt/live/${DOMAIN}/privkey.pem /var/lib/marzban/certs/key.pem
 
 echo "Installation complete!"
 echo "You can manage Nginx using the 'self' utility."
