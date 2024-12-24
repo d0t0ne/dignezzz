@@ -50,9 +50,6 @@ if [[ -z "$EMAIL" ]]; then
   echo -e "${YELLOW}No email provided. Generated email: ${EMAIL}${RESET}"
 fi
 
-read -p "Do you want to use DNS challenge for certificate installation? (Y/n): " USE_DNS
-USE_DNS=${USE_DNS:-y}
-
 DOMAIN_FILE="/etc/nginx/current_domain.txt"
 $SUDO mkdir -p /etc/nginx
 echo "$DOMAIN" | $SUDO tee "$DOMAIN_FILE" > /dev/null
@@ -123,13 +120,9 @@ $SUDO ln -sf "$CERTBOT_CONF" /etc/nginx/sites-enabled/letsencrypt.conf
 $SUDO systemctl enable nginx
 $SUDO systemctl restart nginx
 log_rotation_config
-if [[ "$USE_DNS" == "y" || "$USE_DNS" == "Y" ]]; then
-  echo -e "${CYAN}Obtaining Let's Encrypt certificate using DNS challenge for ${DOMAIN}...${RESET}"
-  $SUDO certbot certonly --manual --preferred-challenges dns -d "$DOMAIN" --email "$EMAIL" --agree-tos --no-eff-email
-else
+
   echo -e "${CYAN}Obtaining Let's Encrypt certificate using web server for ${DOMAIN}...${RESET}"
   $SUDO certbot --nginx -d "$DOMAIN" --email "$EMAIL" --agree-tos --no-eff-email
-fi
 
 if [[ $? -ne 0 ]]; then
   echo -e "${RED}Certbot failed to obtain a certificate. Check the error messages above.${RESET}"
