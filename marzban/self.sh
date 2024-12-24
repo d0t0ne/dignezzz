@@ -70,6 +70,8 @@ configure_ssh() {
   echo -e "${GREEN}SSH configuration updated.${RESET}"
 }
 
+
+
 renew_certs() {
   echo -e "${CYAN}Renewing certificates from main server...${RESET}"
 
@@ -82,28 +84,6 @@ renew_certs() {
 
   scp -P "$SSH_PORT" -i "$SSH_KEY" "$SSH_USER@$SSH_HOST:$CERT_DIR_MAIN/fullchain.pem" "$CERT_DIR/fullchain.pem"
   scp -P "$SSH_PORT" -i "$SSH_KEY" "$SSH_USER@$SSH_HOST:$CERT_DIR_MAIN/privkey.pem" "$CERT_DIR/key.pem"
-
-  if [[ $? -eq 0 ]]; then
-    echo -e "${GREEN}Certificates successfully updated. Reloading Nginx...${RESET}"
-    systemctl reload nginx
-  else
-    echo -e "${RED}Failed to copy certificates. Check SSH connection.${RESET}"
-    return 1
-  fi
-}
-
-renew_certs() {
-  echo -e "${CYAN}Renewing certificates from main server...${RESET}"
-
-  if [[ ! -f "$SSH_CONFIG_FILE" ]]; then
-    echo -e "${RED}SSH configuration file not found. Please configure the SSH connection first.${RESET}"
-    return 1
-  fi
-
-  source "$SSH_CONFIG_FILE"
-
-  scp -P "$SSH_PORT" -i "$SSH_KEY" "$SSH_USER@$SSH_HOST:$CERT_DIR/fullchain.pem" "$CERT_DIR/fullchain.pem"
-  scp -P "$SSH_PORT" -i "$SSH_KEY" "$SSH_USER@$SSH_HOST:$CERT_DIR/privkey.pem" "$CERT_DIR/key.pem"
 
   if [[ $? -eq 0 ]]; then
     echo -e "${GREEN}Certificates successfully updated. Reloading Nginx...${RESET}"
