@@ -8,7 +8,7 @@ RESET='\033[0m'
 BOLD='\\033[1m'
 
 CERT_DIR_MAIN="/var/lib/marzban-vsem/certs"
-CERT_DIR="/var/lib/marzban/certs"
+CERT_DIR="/var/lib/marzban-node/certs"
 SSH_CONFIG_FILE="/etc/nginx/ssh_config"
 
 help_menu() {
