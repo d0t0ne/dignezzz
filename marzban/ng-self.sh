@@ -116,11 +116,11 @@ configure_ssh() {
     SSH_PORT=22
   fi
 
-  mkdir -p "$(dirname \$SSH_CONFIG_FILE)"
-  echo "SSH_USER=\$SSH_USER" > \$SSH_CONFIG_FILE
-  echo "SSH_HOST=\$SSH_HOST" >> \$SSH_CONFIG_FILE
-  echo "SSH_PORT=\$SSH_PORT" >> \$SSH_CONFIG_FILE
-  echo "SSH_KEY=\$SSH_KEY" >> \$SSH_CONFIG_FILE
+  mkdir -p \"\$(dirname \"\$SSH_CONFIG_FILE\")\"
+  echo "SSH_USER=\$SSH_USER" > "\$SSH_CONFIG_FILE"
+  echo "SSH_HOST=\$SSH_HOST" >> "\$SSH_CONFIG_FILE"
+  echo "SSH_PORT=\$SSH_PORT" >> "\$SSH_CONFIG_FILE"
+  echo "SSH_KEY=\$SSH_KEY" >> "\$SSH_CONFIG_FILE"
 
   echo -e "\${GREEN}SSH configuration updated.\${RESET}"
 }
@@ -128,17 +128,17 @@ configure_ssh() {
 renew_certs() {
   echo -e "\${CYAN}Renewing certificates from main server...\${RESET}"
 
-  if [[ ! -f \$SSH_CONFIG_FILE ]]; then
+  if [[ ! -f \"\$SSH_CONFIG_FILE\" ]]; then
     echo -e "\${RED}SSH configuration file not found. Please configure the SSH connection first.\${RESET}"
     return 1
   fi
 
-  source \$SSH_CONFIG_FILE
+  source "\$SSH_CONFIG_FILE"
 
-  scp -P \$SSH_PORT -i \$SSH_KEY \$SSH_USER@\$SSH_HOST:/var/lib/marzban/certs/fullchain.pem \$CERT_DIR/fullchain.pem
-  scp -P \$SSH_PORT -i \$SSH_KEY \$SSH_USER@\$SSH_HOST:/var/lib/marzban/certs/privkey.pem \$CERT_DIR/key.pem
+  scp -P "\$SSH_PORT" -i "\$SSH_KEY" "\$SSH_USER@\$SSH_HOST:/var/lib/marzban/certs/fullchain.pem" "\$CERT_DIR/fullchain.pem"
+  scp -P "\$SSH_PORT" -i "\$SSH_KEY" "\$SSH_USER@\$SSH_HOST:/var/lib/marzban/certs/privkey.pem" "\$CERT_DIR/key.pem"
 
-  if [[ $? -eq 0 ]]; then
+  if [[ \$? -eq 0 ]]; then
     echo -e "\${GREEN}Certificates successfully updated. Reloading Nginx...\${RESET}"
     systemctl reload nginx
   else
@@ -148,11 +148,11 @@ renew_certs() {
 }
 
 cert_status() {
-  if [[ -f "$CERT_DIR/fullchain.pem" ]]; then
-    EXPIRY_DATE=$(openssl x509 -enddate -noout -in "$CERT_DIR/fullchain.pem" | cut -d= -f2)
+  if [[ -f \"\$CERT_DIR/fullchain.pem\" ]]; then
+    EXPIRY_DATE=\$(openssl x509 -enddate -noout -in \"\$CERT_DIR/fullchain.pem\" | cut -d= -f2)
     echo -e "\${GREEN}Certificate expiration date: \${CYAN}\$EXPIRY_DATE\${RESET}"
   else
-    echo -e "\${RED}Certificate not found in $CERT_DIR\${RESET}"
+    echo -e "\${RED}Certificate not found in \$CERT_DIR\${RESET}"
   fi
 }
 
@@ -162,8 +162,8 @@ uninstall() {
   apt-get remove --purge -y nginx
   apt-get autoremove -y
   rm -rf /etc/nginx
-  rm -rf "$CERT_DIR"
-  rm -f "$SELF_PATH"
+  rm -rf \"\$CERT_DIR\"
+  rm -f \"\$SELF_PATH\"
   echo -e "\${GREEN}Uninstallation complete.\${RESET}"
 }
 
@@ -179,15 +179,15 @@ help_menu() {
   echo -e "  \${YELLOW}logs\${RESET}            Show Nginx logs"
   echo -e "  \${YELLOW}uninstall\${RESET}       Uninstall Nginx and remove configurations"
   echo -e "  \${YELLOW}help\${RESET}            Show this help menu"
-  echo -e \"\"
-  echo -e \"\${BOLD}Current Configuration Info:\${RESET}\"
-  echo -e \"  \${CYAN}Domain SNI:\${RESET} \$DOMAIN\"
-  echo -e \"  \${CYAN}Destination:\${RESET}  127.0.0.1:8443\"
-  echo -e \"  \${CYAN}Cert Path:\${RESET}    \$CERT_DIR/\$DOMAIN/\"
-  echo -e \"\"
+  echo -e ""
+  echo -e "\${BOLD}Current Configuration Info:\${RESET}"
+  echo -e "  \${CYAN}Domain SNI:\${RESET} \$DOMAIN"
+  echo -e "  \${CYAN}Destination:\${RESET}  127.0.0.1:8443"
+  echo -e "  \${CYAN}Cert Path:\${RESET}    \$CERT_DIR/\$DOMAIN/"
+  echo -e ""
 }
 
-case "$1" in
+case "\$1" in
   renew)
     renew_certs
     ;;
@@ -216,6 +216,7 @@ case "$1" in
     ;;
 esac
 EOF"
+
 
 $SUDO chmod +x "$SELF_PATH"
 
