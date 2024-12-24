@@ -37,17 +37,21 @@ configure_ssh() {
   read -p "Enter SSH username: " SSH_USER
   read -p "Enter SSH hostname or IP: " SSH_HOST
   read -p "Enter SSH port (default: 22): " SSH_PORT
-  echo -e "Please paste the content of your SSH private key, press ENTER on a new line when finished: "
-  SSH_KEY=""
+  echo -e "Please paste the content of your SSH private key, press ENTER on a new line when finished:"
+  
+  SSH_KEY_PATH="/etc/nginx/ssh_key"
+  > "$SSH_KEY_PATH"
   while IFS= read -r line; do
     if [[ -z $line ]]; then
       break
     fi
-    SSH_KEY+="$line"
+    echo "$line" >> "$SSH_KEY_PATH"
   done
 
-  if [[ -z "$SSH_USER" || -z "$SSH_HOST" || -z "$SSH_KEY" ]]; then
-    echo -e "${RED}Invalid input. All fields are required.${RESET}"
+  chmod 600 "$SSH_KEY_PATH"
+
+  if [[ -z "$SSH_USER" || -z "$SSH_HOST" ]]; then
+    echo -e "${RED}Invalid input. Username and Hostname/IP are required.${RESET}"
     return 1
   fi
 
@@ -59,7 +63,7 @@ configure_ssh() {
   echo "SSH_USER=$SSH_USER" > "$SSH_CONFIG_FILE"
   echo "SSH_HOST=$SSH_HOST" >> "$SSH_CONFIG_FILE"
   echo "SSH_PORT=$SSH_PORT" >> "$SSH_CONFIG_FILE"
-  echo "SSH_KEY=$SSH_KEY" >> "$SSH_CONFIG_FILE"
+  echo "SSH_KEY=$SSH_KEY_PATH" >> "$SSH_CONFIG_FILE"
 
   echo -e "${GREEN}SSH configuration updated.${RESET}"
 }
