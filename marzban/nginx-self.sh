@@ -84,7 +84,7 @@ log_rotation_config() {
     sharedscripts
     postrotate
         if [ -f /var/run/nginx.pid ]; then
-            kill -USR1 $(cat /var/run/nginx.pid)
+            kill -USR1 \$(cat /var/run/nginx.pid)
         fi
     endscript
 }
@@ -148,21 +148,11 @@ server {
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers on;
 
-    # Security headers
     add_header Referrer-Policy \"no-referrer-when-downgrade\" always;
     add_header Permissions-Policy \"interest-cohort=()\" always;
     add_header Strict-Transport-Security \"max-age=31536000; includeSubDomains\" always;
     add_header Content-Security-Policy \"script-src 'self' 'unsafe-inline'\" always;
     proxy_hide_header X-Powered-By;
-
-    # Extra security measures
-    if (\$host !~* ^(.+\\.)?m\\.test\\.org\$ ) { return 444; }
-    if (\$scheme ~* https) { set \$safe 1; }
-    if (\$ssl_server_name !~* ^(.+\\.)?m\\.test\\.org\$ ) { set \$safe \"\${safe}0\"; }
-    if (\$safe = 10) { return 444; }
-    if (\$request_uri ~ (\"|'|`|~|,|:|--|;|%|\\\$|&&|\\?\\?|0x00|0X00|\\||\\\\{|\\}|\\[|\\]|<|>|\\.\\.\\.|\\.\\./|////)) { set \$hack 1; }
-    error_page 400 401 402 403 500 501 502 503 504 =404 /404;
-    proxy_intercept_errors on;
 
     ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305';
 
@@ -174,15 +164,9 @@ server {
     set_real_ip_from 127.0.0.1;
     set_real_ip_from ::1;
 
-    add_header Strict-Transport-Security 'max-age=31536000; includeSubDomains' always;
-    add_header X-Content-Type-Options 'nosniff' always;
-    add_header X-Frame-Options 'DENY' always;
-    add_header Referrer-Policy 'no-referrer' always;
-
     root /var/www/html/site;
     index index.html;
 
-    # Rate limiting
     limit_req_zone \$binary_remote_addr zone=one:10m rate=10r/s;
     limit_conn_zone \$binary_remote_addr zone=addr:10m;
 
