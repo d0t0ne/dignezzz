@@ -91,11 +91,11 @@ log_rotation_config() {
 EOF"
 }
 
-log_rotation_config
+
 
 echo -e "${CYAN}Installing Nginx, Certbot, and python3-certbot-nginx...${RESET}"
 $SUDO apt-get update -qq
-$SUDO apt-get install -y -qq nginx certbot python3-certbot-nginx > /dev/null 2>&1
+$SUDO apt-get install -y -qq nginx certbot python3-certbot-nginx 
 if [[ $? -ne 0 ]]; then
   echo -e "${RED}Failed to install required packages. Ensure your system is updated and retry.${RESET}"
   exit 1
@@ -122,7 +122,7 @@ $SUDO ln -sf "$CERTBOT_CONF" /etc/nginx/sites-enabled/letsencrypt.conf
 
 $SUDO systemctl enable nginx
 $SUDO systemctl restart nginx
-
+log_rotation_config
 if [[ "$USE_DNS" == "y" || "$USE_DNS" == "Y" ]]; then
   echo -e "${CYAN}Obtaining Let's Encrypt certificate using DNS challenge for ${DOMAIN}...${RESET}"
   $SUDO certbot certonly --manual --preferred-challenges dns -d "$DOMAIN" --email "$EMAIL" --agree-tos --no-eff-email
