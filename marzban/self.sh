@@ -86,7 +86,7 @@ renew_certs() {
   source "$SSH_CONFIG_FILE"
 
   scp -P "$SSH_PORT" -i "$SSH_KEY" "$SSH_USER@$SSH_HOST:$CERT_DIR_MAIN/fullchain.pem" "$CERT_DIR/fullchain.pem"
-  scp -P "$SSH_PORT" -i "$SSH_KEY" "$SSH_USER@$SSH_HOST:$CERT_DIR_MAIN/privkey.pem" "$CERT_DIR/key.pem"
+  scp -P "$SSH_PORT" -i "$SSH_KEY" "$SSH_USER@$SSH_HOST:$CERT_DIR_MAIN/key.pem" "$CERT_DIR/key.pem"
 
   if [[ $? -eq 0 ]]; then
     echo -e "${GREEN}Certificates successfully updated. Reloading Nginx...${RESET}"
