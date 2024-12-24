@@ -96,7 +96,7 @@ $SUDO nginx -t && $SUDO systemctl reload nginx
 $SUDO bash -c "cat << 'EOF' > \"$SELF_PATH\""
 #!/bin/bash
 
-CERT_DIR="$CERT_DIR"
+CERT_DIR="/var/lib/marzban-vsem/certs"
 SSH_CONFIG_FILE="$SSH_CONFIG_FILE"
 
 configure_ssh() {
