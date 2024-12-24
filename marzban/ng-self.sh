@@ -46,13 +46,14 @@ else
 fi
 
 CONF_FILE="/etc/nginx/sites-available/sni.conf"
-$SUDO bash -c "cat <<'EOF' > \"$CONF_FILE\""
+$SUDO bash -c "cat <<'EOF' > \"$CONF_FILE\"
 server {
     listen 127.0.0.1:8443 ssl http2 proxy_protocol;
-    server_name default_server;
+    server_name $DOMAIN;
 
-    ssl_certificate /var/lib/marzban/certs/fullchain.pem;
-    ssl_certificate_key /var/lib/marzban/certs/key.pem;
+    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
+    ssl_trusted_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
 
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers on;
@@ -88,7 +89,7 @@ server {
         root /usr/share/nginx/html;
     }
 }
-EOF
+EOF"
 
 ln -sf "$CONF_FILE" /etc/nginx/sites-enabled/
 $SUDO nginx -t && $SUDO systemctl reload nginx
@@ -178,6 +179,12 @@ help_menu() {
   echo -e "  \${YELLOW}logs\${RESET}            Show Nginx logs"
   echo -e "  \${YELLOW}uninstall\${RESET}       Uninstall Nginx and remove configurations"
   echo -e "  \${YELLOW}help\${RESET}            Show this help menu"
+  echo -e \"\"
+  echo -e \"\${BOLD}Current Configuration Info:\${RESET}\"
+  echo -e \"  \${CYAN}Domain SNI:\${RESET} \$DOMAIN\"
+  echo -e \"  \${CYAN}Destination:\${RESET}  127.0.0.1:8443\"
+  echo -e \"  \${CYAN}Cert Path:\${RESET}    \$CERT_DIR/\$DOMAIN/\"
+  echo -e \"\"
 }
 
 case "$1" in
@@ -208,7 +215,7 @@ case "$1" in
     echo -e "\${RED}Invalid command. Use 'help' for available commands.\${RESET}"
     ;;
 esac
-EOF
+EOF"
 
 $SUDO chmod +x "$SELF_PATH"
 
