@@ -192,10 +192,121 @@ $SUDO rm -f /etc/nginx/sites-available/letsencrypt.conf
 SELF_PATH="/usr/local/bin/self"
 $SUDO bash -c "cat << 'EOF' > \"$SELF_PATH\"
 #!/bin/bash
-# Management utility (unchanged content from the previous script)
+
+# Цвета для выделения
+RED='\\033[0;31m'
+GREEN='\\033[0;32m'
+YELLOW='\\033[0;33m'
+CYAN='\\033[0;36m'
+BOLD='\\033[1m'
+RESET='\\033[0m'
+
+CERT_DIR=\"/etc/letsencrypt/live\"
+DOMAIN_FILE=\"/etc/nginx/current_domain.txt\"
+DOMAIN=\"\"
+
+if [[ -f \$DOMAIN_FILE ]]; then
+  DOMAIN=\$(cat \$DOMAIN_FILE)
+else
+  echo -e \"\${RED}Domain file not found. Set DOMAIN manually.\${RESET}\"
+  DOMAIN=\"example.com\"
+fi
+
+help_menu() {
+  echo -e \"\"
+  echo -e \"\${CYAN}=========================================\${RESET}\"
+  echo -e \"\${BOLD}          Nginx Management Utility        \${RESET}\"
+  echo -e \"\${CYAN}=========================================\${RESET}\"
+  echo -e \"\"
+  echo -e \"\${BOLD}Available Commands:\${RESET}\"
+  echo -e \"  \${GREEN}e\${RESET}             \${YELLOW}Edit /etc/nginx/nginx.conf\${RESET}\"
+  echo -e \"  \${GREEN}r\${RESET}             \${YELLOW}Restart Nginx\${RESET}\"
+  echo -e \"  \${GREEN}logs\${RESET}          \${YELLOW}Show Nginx logs\${RESET}\"
+  echo -e \"  \${GREEN}s | status\${RESET}    \${YELLOW}Show 'systemctl status nginx'\${RESET}\"
+  echo -e \"  \${GREEN}renew\${RESET}         \${YELLOW}Renew SSL certificates\${RESET}\"
+  echo -e \"  \${GREEN}cert-status\${RESET}   \${YELLOW}Check SSL certificate expiration\${RESET}\"
+  echo -e \"  \${GREEN}reinstall\${RESET}     \${YELLOW}Reload Nginx\${RESET}\"
+  echo -e \"  \${GREEN}uninstall\${RESET}     \${YELLOW}Remove Nginx, Certbot, and configurations\${RESET}\"
+  echo -e \"\"
+  echo -e \"\${BOLD}Current Configuration Info:\${RESET}\"
+  echo -e \"  \${CYAN}Domain SNI:\${RESET} \$DOMAIN\"
+  echo -e \"  \${CYAN}Destination:\${RESET}  127.0.0.1:8443\"
+  echo -e \"  \${CYAN}Cert Path:\${RESET}    \$CERT_DIR/\$DOMAIN/\"
+  echo -e \"\"
+}
+
+cert_status() {
+  if [[ -d \$CERT_DIR/\$DOMAIN ]]; then
+    EXPIRY_DATE=\$(openssl x509 -enddate -noout -in \$CERT_DIR/\$DOMAIN/fullchain.pem | cut -d= -f2)
+    echo -e \"\${GREEN}Certificate for \$DOMAIN expires on: \${BOLD}\$EXPIRY_DATE\${RESET}\"
+  else
+    echo -e \"\${RED}Certificate files not found for domain \$DOMAIN in \$CERT_DIR.\${RESET}\"
+  fi
+}
+
+renew_certs() {
+  echo -e \"\${YELLOW}Renewing SSL certificates for \$DOMAIN...\${RESET}\"
+  certbot renew --nginx
+  if [[ \$? -eq 0 ]]; then
+    echo -e \"\${GREEN}Certificates successfully renewed.\${RESET}\"
+  else
+    echo -e \"\${RED}Failed to renew certificates. Check Certbot logs for details.\${RESET}\"
+  fi
+}
+
+case \"\$1\" in
+  e)
+    echo -e \"\${CYAN}Opening /etc/nginx/nginx.conf...\${RESET}\"
+    nano /etc/nginx/nginx.conf
+    ;;
+  r)
+    echo -e \"\${CYAN}Restarting Nginx...\${RESET}\"
+    systemctl restart nginx
+    ;;
+  logs)
+    echo -e \"\${CYAN}Showing Nginx logs (Ctrl+C to exit)...\${RESET}\"
+    journalctl -u nginx -n 50 -f
+    ;;
+  s|status)
+    echo -e \"\${CYAN}-- systemctl status nginx --\${RESET}\"
+    systemctl status nginx
+    ;;
+  renew)
+    renew_certs
+    ;;
+  cert-status)
+    cert_status
+    ;;
+  reinstall)
+    echo -e \"\${CYAN}Reloading Nginx configuration...\${RESET}\"
+    systemctl reload nginx || systemctl restart nginx
+    ;;
+  uninstall)
+    echo -e \"\${YELLOW}Stopping and removing Nginx and Certbot...\${RESET}\"
+    systemctl stop nginx
+    apt-get remove --purge -y nginx certbot python3-certbot-nginx
+    apt-get autoremove -y
+    rm -rf /etc/letsencrypt
+    rm -rf /etc/nginx
+    rm -f /usr/local/bin/self
+    echo -e \"\${RED}All components removed.\${RESET}\"
+    ;;
+  help)
+    help_menu
+    ;;
+  *)
+    echo -e \"\${RED}Invalid command.\${RESET}\"
+    help_menu
+    ;;
+esac
 EOF"
+
 
 $SUDO chmod +x "$SELF_PATH"
 
-echo "Installation complete! Log rotation configured and DNS challenge option added."
+if [[ ":$PATH:" != *":/usr/local/bin:"* ]]; then
+ export PATH=$PATH:/usr/local/bin
+fi
+
+echo "Installation complete!"
 echo "You can manage Nginx using the 'self' utility."
