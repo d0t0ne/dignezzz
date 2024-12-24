@@ -144,35 +144,34 @@ server {
 
     ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
+    ssl_trusted_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
 
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers on;
-
-    add_header Referrer-Policy \"no-referrer-when-downgrade\" always;
-    add_header Permissions-Policy \"interest-cohort=()\" always;
-    add_header Strict-Transport-Security \"max-age=31536000; includeSubDomains\" always;
-    add_header Content-Security-Policy \"script-src 'self' 'unsafe-inline'\" always;
-    proxy_hide_header X-Powered-By;
-
     ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305';
 
     ssl_session_cache shared:SSL:1m;
     ssl_session_timeout 1d;
     ssl_session_tickets off;
 
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    resolver 1.1.1.1 valid=60s;
+    resolver_timeout 2s;
+
     real_ip_header proxy_protocol;
     set_real_ip_from 127.0.0.1;
     set_real_ip_from ::1;
 
+    add_header Strict-Transport-Security 'max-age=31536000; includeSubDomains' always;
+    add_header X-Content-Type-Options 'nosniff' always;
+    add_header X-Frame-Options 'DENY' always;
+    add_header Referrer-Policy 'no-referrer' always;
+
     root /var/www/html/site;
     index index.html;
 
-    limit_req_zone \$binary_remote_addr zone=one:10m rate=10r/s;
-    limit_conn_zone \$binary_remote_addr zone=addr:10m;
-
     location / {
-        limit_req zone=one burst=20 nodelay;
-        limit_conn addr 10;
         try_files \$uri \$uri/ =404;
     }
 
