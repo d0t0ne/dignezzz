@@ -157,11 +157,6 @@ server {
     ssl_session_timeout 1d;
     ssl_session_tickets off;
 
-    ssl_stapling on;
-    ssl_stapling_verify on;
-    resolver 1.1.1.1 valid=60s;
-    resolver_timeout 2s;
-
     real_ip_header proxy_protocol;
     set_real_ip_from 127.0.0.1;
     set_real_ip_from ::1;
