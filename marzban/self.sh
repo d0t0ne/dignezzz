@@ -37,7 +37,14 @@ configure_ssh() {
   read -p "Enter SSH username: " SSH_USER
   read -p "Enter SSH hostname or IP: " SSH_HOST
   read -p "Enter SSH port (default: 22): " SSH_PORT
-  read -p "Enter path to your SSH private key: " SSH_KEY
+  echo -e "Please paste the content of your SSH private key, press ENTER on a new line when finished: "
+  SSH_KEY=""
+  while IFS= read -r line; do
+    if [[ -z $line ]]; then
+      break
+    fi
+    SSH_KEY+="$line"
+  done
 
   if [[ -z "$SSH_USER" || -z "$SSH_HOST" || -z "$SSH_KEY" ]]; then
     echo -e "${RED}Invalid input. All fields are required.${RESET}"
@@ -176,7 +183,7 @@ install_script() {
 }
 
 case "$1" in
-  @install)
+  install|@install)
     install_script
     install_nginx
     ;;
