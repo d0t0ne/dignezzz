@@ -180,9 +180,14 @@ server {
 
     root /var/www/html/site;
     index index.html;
+   # Rate limiting
+    limit_req_zone $binary_remote_addr zone=one:10m rate=10r/s;
+    limit_conn_zone $binary_remote_addr zone=addr:10m;
 
     location / {
-        try_files \$uri \$uri/ =404;
+        limit_req zone=one burst=20 nodelay;
+        limit_conn addr 10;
+        try_files $uri $uri/ =404;
     }
 
     error_page 403 404 500 502 503 504 /error.html;
