@@ -22,6 +22,7 @@ help_menu() {
   echo -e "  ${YELLOW}r${RESET}              Restart Nginx"
   echo -e "  ${YELLOW}logs${RESET}           Show Nginx logs"
   echo -e "  ${YELLOW}s | status${RESET}     Show 'systemctl status nginx'"
+  echo -e "  ${YELLOW}renew${RESET}          Renew certificates and reload Nginx"
   echo -e "  ${YELLOW}reinstall${RESET}      Reload Nginx configuration"
   echo -e "  ${YELLOW}uninstall${RESET}      Remove Nginx and configurations"
   echo -e ""
@@ -86,6 +87,47 @@ renew_certs() {
     systemctl reload nginx
   else
     echo -e "${RED}Failed to copy certificates. Check SSH connection.${RESET}"
+    return 1
+  fi
+}
+
+renew_certs() {
+  echo -e "${CYAN}Renewing certificates from main server...${RESET}"
+
+  if [[ ! -f "$SSH_CONFIG_FILE" ]]; then
+    echo -e "${RED}SSH configuration file not found. Please configure the SSH connection first.${RESET}"
+    return 1
+  fi
+
+  source "$SSH_CONFIG_FILE"
+
+  scp -P "$SSH_PORT" -i "$SSH_KEY" "$SSH_USER@$SSH_HOST:$CERT_DIR/fullchain.pem" "$CERT_DIR/fullchain.pem"
+  scp -P "$SSH_PORT" -i "$SSH_KEY" "$SSH_USER@$SSH_HOST:$CERT_DIR/privkey.pem" "$CERT_DIR/key.pem"
+
+  if [[ $? -eq 0 ]]; then
+    echo -e "${GREEN}Certificates successfully updated. Reloading Nginx...${RESET}"
+    systemctl reload nginx
+  else
+    echo -e "${RED}Failed to copy certificates. Check SSH connection.${RESET}"
+    return 1
+  fi
+}
+
+renew() {
+  echo -e "${CYAN}Renewing and reloading Nginx configuration...${RESET}"
+
+  if [[ ! -f "$SSH_CONFIG_FILE" ]]; then
+    echo -e "${RED}SSH configuration file not found. Please configure the SSH connection first.${RESET}"
+    return 1
+  fi
+
+  renew_certs
+
+  if nginx -t; then
+    systemctl reload nginx
+    echo -e "${GREEN}Nginx reloaded successfully with the renewed certificates.${RESET}"
+  else
+    echo -e "${RED}Nginx configuration test failed. Please check the configuration file.${RESET}"
     return 1
   fi
 }
@@ -187,6 +229,9 @@ install_script() {
 }
 
 case "$1" in
+  renew)
+    renew
+    ;;
   install|@install)
     install_script
     install_nginx
