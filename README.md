@@ -10,6 +10,7 @@
 | backup2e.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/backup2e.sh)` |
 | ufw_main.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/ufw_main.sh)` |
 | move_to_sql.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/move_to_sql.sh)` |
+| ng-self.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/ng-self.sh)` |
 | core_change.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/core_change.sh)` |
 | migrate_to_mysql.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/migrate_to_mysql.sh)` |
 | backup2.sh | `bash <(wget -qO- https://dignezzz.github.io/marzban/backup2.sh)` |
@@ -29,4 +30,4 @@
 | dest.sh | `bash <(wget -qO- https://dignezzz.github.io/server/dest.sh)` |
 
 
-_Last updated at Tue Dec 24 09:01:27 UTC 2024_ 
+_Last updated at Tue Dec 24 12:09:27 UTC 2024_ 
