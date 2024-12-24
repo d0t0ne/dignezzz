@@ -195,6 +195,16 @@ EOF
     echo -e "${RED}Nginx configuration test failed. Please check the configuration file.${RESET}"
     exit 1
   fi
+  
+if command -v ufw &> /dev/null && ufw status | grep -qw active; then
+  echo -e "${CYAN}Closing port 8443 in UFW...${RESET}"
+  ufw delete allow 8443/tcp
+  ufw reload
+else
+  echo -e "${CYAN}Applying iptables rules to block external access to port 8443...${RESET}"
+  iptables -I INPUT -p tcp --dport 8443 ! -s 127.0.0.1 -j DROP
+
+fi
 }
 
 install_script() {
