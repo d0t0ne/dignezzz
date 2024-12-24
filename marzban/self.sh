@@ -35,13 +35,16 @@ help_menu() {
 }
 
 configure_ssh() {
+   SSH_KEY_PATH="/etc/nginx/ssh_key"
+ mkdir -p "$(dirname "$SSH_KEY_PATH")"
+
   echo -e "${CYAN}Setting up SSH connection...${RESET}"
   read -p "Enter SSH username: " SSH_USER
   read -p "Enter SSH hostname or IP: " SSH_HOST
   read -p "Enter SSH port (default: 22): " SSH_PORT
   echo -e "Please paste the content of your SSH private key, press ENTER on a new line when finished:"
   
-  SSH_KEY_PATH="/etc/nginx/ssh_key"
+
   > "$SSH_KEY_PATH"
   while IFS= read -r line; do
     if [[ -z $line ]]; then
