@@ -226,3 +226,8 @@ DOMAIN-SUFFIX,chukotka.ru
 DOMAIN-SUFFIX,jamal.ru
 DOMAIN-SUFFIX,surgut.ru
 DOMAIN-SUFFIX,yamal.ru
+DOMAIN-SUFFIX,2gis.com
+DOMAIN-SUFFIX,licard.com # https://apps.apple.com/ru/app/азс-лукойл-заправки-карта/id959900548
+DOMAIN-SUFFIX,yandex-bank # add shadowrocket/proxy-finance-ru.list
+DOMAIN-SUFFIX,yandex-net.ru
+DOMAIN-SUFFIX,yandex.net
